@@ -20,6 +20,12 @@ function rowToEntry(row: Record<string, unknown>): FoodEntry {
   };
 }
 
+function sb(promise: PromiseLike<{ error: unknown }>) {
+  Promise.resolve(promise).then(({ error }) => {
+    if (error) console.error('[supabase]', error);
+  });
+}
+
 export function useNutrition() {
   const [data, setData] = useState<NutritionData>({});
   const [loaded, setLoaded] = useState(false);
@@ -29,7 +35,8 @@ export function useNutrition() {
       .from('nutrition_entries')
       .select('*')
       .eq('user_id', USER_ID)
-      .then(({ data: rows }) => {
+      .then(({ data: rows, error }) => {
+        if (error) console.error('[supabase load]', error);
         if (rows) {
           const grouped: NutritionData = {};
           for (const row of rows) {
@@ -46,9 +53,8 @@ export function useNutrition() {
   const addEntry = useCallback((date: string, entry: Omit<FoodEntry, 'id' | 'time'>) => {
     const id = newId();
     const full: FoodEntry = { ...entry, id, time: new Date().toISOString() };
-    // Optimistic update
     setData(prev => ({ ...prev, [date]: [...(prev[date] ?? []), full] }));
-    supabase.from('nutrition_entries').insert({ id, user_id: USER_ID, date, ...entry });
+    sb(supabase.from('nutrition_entries').insert({ id, user_id: USER_ID, date, ...entry }));
   }, []);
 
   const addEntries = useCallback((date: string, entries: Omit<FoodEntry, 'id' | 'time'>[]) => {
@@ -58,15 +64,13 @@ export function useNutrition() {
       id: r.id, name: r.name, grams: r.grams,
       kcal: r.kcal, p: r.p, f: r.f, c: r.c, time: now,
     }));
-    // Optimistic update
     setData(prev => ({ ...prev, [date]: [...(prev[date] ?? []), ...full] }));
-    supabase.from('nutrition_entries').insert(rows);
+    sb(supabase.from('nutrition_entries').insert(rows));
   }, []);
 
   const deleteEntry = useCallback((date: string, id: string) => {
-    // Optimistic update
     setData(prev => ({ ...prev, [date]: (prev[date] ?? []).filter(e => e.id !== id) }));
-    supabase.from('nutrition_entries').delete().eq('id', id);
+    sb(supabase.from('nutrition_entries').delete().eq('id', id));
   }, []);
 
   const getDayEntries = useCallback(
@@ -75,7 +79,8 @@ export function useNutrition() {
   );
 
   const replaceAll = useCallback(async (newData: NutritionData) => {
-    await supabase.from('nutrition_entries').delete().eq('user_id', USER_ID);
+    const { error: delErr } = await supabase.from('nutrition_entries').delete().eq('user_id', USER_ID);
+    if (delErr) console.error('[supabase replaceAll delete]', delErr);
     const rows = Object.entries(newData).flatMap(([date, entries]) =>
       entries.map(e => ({
         id: e.id || newId(),
@@ -89,7 +94,10 @@ export function useNutrition() {
         c: e.c,
       }))
     );
-    if (rows.length > 0) await supabase.from('nutrition_entries').insert(rows);
+    if (rows.length > 0) {
+      const { error: insErr } = await supabase.from('nutrition_entries').insert(rows);
+      if (insErr) console.error('[supabase replaceAll insert]', insErr);
+    }
     setData(newData);
   }, []);
 
