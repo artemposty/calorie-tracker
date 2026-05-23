@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Settings, Database } from 'lucide-react';
 import { Goals, AppExport } from '@/lib/types';
-import { DEFAULT_GOALS, GOALS_STORAGE_KEY } from '@/lib/constants';
+import { DEFAULT_GOALS } from '@/lib/constants';
+import { supabase, USER_ID } from '@/lib/supabase';
 import { useNutrition } from '@/hooks/useNutrition';
 import { useWeight } from '@/hooks/useWeight';
 import { LoadingScreen } from '@/components/shared/LoadingScreen';
@@ -24,16 +25,22 @@ export default function Home() {
   const weight = useWeight();
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(GOALS_STORAGE_KEY);
-      if (raw) setGoals(JSON.parse(raw));
-    } catch { /* use defaults */ }
-    setGoalsLoaded(true);
+    supabase
+      .from('user_goals')
+      .select('*')
+      .eq('user_id', USER_ID)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setGoals({ kcal: data.kcal, protein: data.protein, fat: data.fat, carbs: data.carbs });
+        }
+        setGoalsLoaded(true);
+      });
   }, []);
 
   function saveGoals(g: Goals) {
     setGoals(g);
-    localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(g));
+    supabase.from('user_goals').upsert({ user_id: USER_ID, ...g, updated_at: new Date().toISOString() });
   }
 
   function handleImport(data: AppExport) {
@@ -48,7 +55,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Fixed header */}
       <header className="fixed top-0 left-0 right-0 z-20 bg-slate-50 border-b border-slate-200">
         <div
           className="max-w-md mx-auto flex items-center justify-between px-5 h-14"
@@ -74,7 +80,6 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Scrollable content */}
       <div
         className="max-w-md mx-auto"
         style={{ paddingTop: '56px', paddingBottom: 'calc(64px + env(safe-area-inset-bottom))' }}

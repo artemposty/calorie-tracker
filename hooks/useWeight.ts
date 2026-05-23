@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { WeightEntry } from '@/lib/types';
-import { WEIGHT_STORAGE_KEY } from '@/lib/constants';
+import { supabase, USER_ID } from '@/lib/supabase';
 import { newId } from '@/lib/storage';
 
 export function useWeight() {
@@ -10,32 +10,38 @@ export function useWeight() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(WEIGHT_STORAGE_KEY);
-      if (raw) setEntries(JSON.parse(raw));
-    } catch { /* corrupted data */ }
-    setLoaded(true);
+    supabase
+      .from('weight_entries')
+      .select('*')
+      .eq('user_id', USER_ID)
+      .then(({ data: rows }) => {
+        if (rows) {
+          setEntries(rows.map(r => ({
+            id: r.id as string,
+            date: r.date as string,
+            weight: Number(r.weight),
+          })));
+        }
+        setLoaded(true);
+      });
   }, []);
-
-  useEffect(() => {
-    if (!loaded) return;
-    localStorage.setItem(WEIGHT_STORAGE_KEY, JSON.stringify(entries));
-  }, [entries, loaded]);
 
   const setWeight = useCallback((date: string, weight: number) => {
     setEntries(prev => {
-      const existing = prev.findIndex(e => e.date === date);
-      if (existing >= 0) {
-        const updated = [...prev];
-        updated[existing] = { ...updated[existing], weight };
-        return updated;
+      const exists = prev.find(e => e.date === date);
+      if (exists) {
+        supabase.from('weight_entries').update({ weight }).eq('id', exists.id);
+        return prev.map(e => e.date === date ? { ...e, weight } : e);
       }
-      return [...prev, { id: newId(), date, weight }];
+      const id = newId();
+      supabase.from('weight_entries').insert({ id, user_id: USER_ID, date, weight });
+      return [...prev, { id, date, weight }];
     });
   }, []);
 
   const deleteEntry = useCallback((id: string) => {
     setEntries(prev => prev.filter(e => e.id !== id));
+    supabase.from('weight_entries').delete().eq('id', id);
   }, []);
 
   const getByDate = useCallback(
@@ -48,8 +54,6 @@ export function useWeight() {
     if (sorted.length === 0) return null;
 
     const allWeights = sorted.map(e => e.weight);
-    const min = Math.min(...allWeights);
-    const max = Math.max(...allWeights);
     const start = sorted[0].weight;
     const current = sorted[sorted.length - 1].weight;
 
@@ -61,10 +65,20 @@ export function useWeight() {
       weekTrend = avg(last7) - avg(prev7);
     }
 
-    return { min, max, start, current, weekTrend, count: sorted.length };
+    return {
+      min: Math.min(...allWeights),
+      max: Math.max(...allWeights),
+      start, current, weekTrend, count: sorted.length,
+    };
   }, [entries]);
 
-  const replaceAll = useCallback((newEntries: WeightEntry[]) => {
+  const replaceAll = useCallback(async (newEntries: WeightEntry[]) => {
+    await supabase.from('weight_entries').delete().eq('user_id', USER_ID);
+    if (newEntries.length > 0) {
+      await supabase.from('weight_entries').insert(
+        newEntries.map(e => ({ id: e.id || newId(), user_id: USER_ID, date: e.date, weight: e.weight }))
+      );
+    }
     setEntries(newEntries);
   }, []);
 
