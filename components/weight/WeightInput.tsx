@@ -40,11 +40,11 @@ export function WeightInput({ date, value, onSave }: Props) {
         />
         <button
           onClick={handleSave}
-          className={`px-5 py-3 rounded-xl font-medium text-sm transition-colors shrink-0 ${
+          className={`px-4 py-2 rounded-xl font-medium text-sm transition-colors shrink-0 ${
             saved ? 'bg-green-500 text-white' : 'bg-slate-900 text-white'
           }`}
         >
-          {saved ? '✓ Сохранено' : 'Сохранить'}
+          {saved ? '✓' : 'Сохранить'}
         </button>
       </div>
     </div>
