@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Legend,
+  ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { Goals } from '@/lib/types';
 
@@ -18,7 +19,15 @@ interface Props {
   goals: Goals;
 }
 
+const MACROS = [
+  { key: 'p', label: 'Белки', color: '#3b82f6', goalKey: 'protein' },
+  { key: 'f', label: 'Жиры', color: '#f59e0b', goalKey: 'fat' },
+  { key: 'c', label: 'Углеводы', color: '#10b981', goalKey: 'carbs' },
+] as const;
+
 export function MacroChart({ data, goals }: Props) {
+  const [hidden, setHidden] = useState<string[]>([]);
+
   if (data.filter(d => d.p > 0 || d.f > 0 || d.c > 0).length < 2) {
     return (
       <div className="bg-white rounded-2xl p-5 shadow-sm flex items-center justify-center min-h-[180px]">
@@ -27,22 +36,30 @@ export function MacroChart({ data, goals }: Props) {
     );
   }
 
-  const MACROS = [
-    { key: 'p', label: 'Белки', color: '#3b82f6', goal: goals.protein },
-    { key: 'f', label: 'Жиры', color: '#f59e0b', goal: goals.fat },
-    { key: 'c', label: 'Углеводы', color: '#10b981', goal: goals.carbs },
-  ] as const;
+  function toggle(key: string) {
+    setHidden(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  }
+
+  const visible = MACROS.filter(m => !hidden.includes(m.key));
 
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm">
       <p className="text-xs text-slate-400 mb-3">БЖУ по дням, г</p>
-      <div className="flex items-center gap-4 mb-3 flex-wrap">
-        {MACROS.map(m => (
-          <span key={m.key} className="flex items-center gap-1 text-xs text-slate-500">
-            <span className="w-5 h-0.5 inline-block" style={{ backgroundColor: m.color }} />
-            {m.label} <span className="text-slate-300">({m.goal}г)</span>
-          </span>
-        ))}
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        {MACROS.map(m => {
+          const isHidden = hidden.includes(m.key);
+          return (
+            <button
+              key={m.key}
+              onClick={() => toggle(m.key)}
+              className={`flex items-center gap-1.5 text-xs transition-opacity active:scale-95 ${isHidden ? 'opacity-30' : 'text-slate-500'}`}
+            >
+              <span className="w-5 h-0.5 inline-block rounded-full" style={{ backgroundColor: m.color }} />
+              {m.label}
+              <span className="text-slate-300">({goals[m.goalKey]}г)</span>
+            </button>
+          );
+        })}
       </div>
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -8 }}>
@@ -60,18 +77,21 @@ export function MacroChart({ data, goals }: Props) {
           />
           <Tooltip
             contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: 12 }}
-            formatter={(v, name) => [`${v} г`, name === 'p' ? 'Белки' : name === 'f' ? 'Жиры' : 'Углеводы']}
+            formatter={(v, name) => {
+              const m = MACROS.find(m => m.key === name);
+              return [`${v} г`, m?.label ?? String(name)];
+            }}
           />
-          {MACROS.map(m => (
+          {visible.map(m => (
             <ReferenceLine
               key={`ref-${m.key}`}
-              y={m.goal}
+              y={goals[m.goalKey]}
               stroke={m.color}
               strokeDasharray="4 4"
               strokeOpacity={0.4}
             />
           ))}
-          {MACROS.map(m => (
+          {visible.map(m => (
             <Line
               key={m.key}
               type="monotone"

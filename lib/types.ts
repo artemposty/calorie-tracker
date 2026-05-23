@@ -38,6 +38,15 @@ export interface DayTotals {
   c: number;
 }
 
+export interface UserFoodItem {
+  id: string;
+  name: string;
+  kcal: number;
+  p: number;
+  f: number;
+  c: number;
+}
+
 export interface AppExport {
   version: number;
   exportDate: string;

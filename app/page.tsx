@@ -83,7 +83,7 @@ export default function Home() {
 
       <div
         className="max-w-md mx-auto"
-        style={{ paddingTop: 'calc(56px + env(safe-area-inset-top))', paddingBottom: 'calc(64px + env(safe-area-inset-bottom))' }}
+        style={{ paddingTop: 'calc(56px + env(safe-area-inset-top))', paddingBottom: 'calc(90px + env(safe-area-inset-bottom))' }}
       >
         {tab === 'nutrition' && (
           <NutritionTab
