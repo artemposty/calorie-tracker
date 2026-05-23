@@ -21,14 +21,16 @@ export function TabBar({ active, onChange }: Props) {
       className="fixed bottom-0 left-0 right-0 z-20 flex justify-center pointer-events-none"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}
     >
+      {/* overflow:hidden removed — it breaks backdrop-filter in Safari */}
       <div
-        className="flex items-stretch rounded-[26px] overflow-hidden mx-4 w-full max-w-sm pointer-events-auto"
+        className="flex items-stretch mx-4 w-full max-w-sm pointer-events-auto"
         style={{
-          background: 'rgba(255, 255, 255, 0.6)',
-          backdropFilter: 'blur(24px) saturate(200%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(200%)',
-          border: '1px solid rgba(255, 255, 255, 0.7)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.85)',
+          borderRadius: '26px',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(248,250,252,0.68) 100%)',
+          backdropFilter: 'blur(28px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.75)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.95)',
         }}
       >
         {TABS.map(({ id, label, Icon }) => (

@@ -14,7 +14,7 @@ body {
 }
 
 html, body {
-  overscroll-behavior: none;
+  overscroll-behavior-y: auto;
 }
 
 input[type="number"]::-webkit-inner-spin-button,
