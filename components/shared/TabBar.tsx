@@ -1,8 +1,8 @@
 'use client';
 
-import { Utensils, Scale } from 'lucide-react';
+import { Utensils, Scale, BarChart2 } from 'lucide-react';
 
-export type Tab = 'nutrition' | 'weight';
+export type Tab = 'nutrition' | 'weight' | 'stats';
 
 interface Props {
   active: Tab;
@@ -12,6 +12,7 @@ interface Props {
 const TABS: { id: Tab; label: string; Icon: typeof Utensils }[] = [
   { id: 'nutrition', label: 'Питание', Icon: Utensils },
   { id: 'weight', label: 'Вес', Icon: Scale },
+  { id: 'stats', label: 'Статистика', Icon: BarChart2 },
 ];
 
 export function TabBar({ active, onChange }: Props) {

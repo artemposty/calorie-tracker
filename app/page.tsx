@@ -13,6 +13,7 @@ import { ExportModal } from '@/components/shared/ExportModal';
 import { SettingsModal } from '@/components/settings/SettingsModal';
 import { NutritionTab } from '@/components/nutrition/NutritionTab';
 import { WeightTab } from '@/components/weight/WeightTab';
+import { StatsTab } from '@/components/stats/StatsTab';
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>('nutrition');
@@ -100,6 +101,12 @@ export default function Home() {
             deleteEntry={weight.deleteEntry}
             getByDate={weight.getByDate}
             getStats={weight.getStats}
+          />
+        )}
+        {tab === 'stats' && (
+          <StatsTab
+            nutritionData={nutrition.data}
+            goals={goals}
           />
         )}
       </div>
