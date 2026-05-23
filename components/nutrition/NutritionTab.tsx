@@ -40,7 +40,7 @@ export function NutritionTab({ goals, getDayEntries, addEntry, addEntries, delet
       {/* FAB */}
       <button
         onClick={() => setShowAdd(true)}
-        className="fixed right-5 z-10 w-14 h-14 bg-slate-900 text-white rounded-full shadow-xl flex items-center justify-center active:scale-95 transition-transform"
+        className="fixed right-5 z-10 w-14 h-14 bg-slate-900 text-white rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform duration-100"
         style={{ bottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}
         aria-label="Добавить приём пищи"
       >

@@ -36,7 +36,7 @@ export function MacroProgress({ totals, goals }: Props) {
             </div>
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-300 ${isOver ? overColor : color}`}
+                className={`h-full rounded-full transition-[width] duration-500 ease-out ${isOver ? overColor : color}`}
                 style={{ width: `${pct}%` }}
               />
             </div>

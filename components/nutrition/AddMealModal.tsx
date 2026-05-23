@@ -116,9 +116,9 @@ export function AddMealModal({ onAdd, onAddMany, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 modal-backdrop" onClick={onClose} />
       <div
-        className="relative bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md flex flex-col"
+        className="modal-sheet relative bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md flex flex-col"
         style={{ maxHeight: '90dvh', paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {/* Header */}

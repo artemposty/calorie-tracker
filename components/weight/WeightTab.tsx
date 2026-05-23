@@ -1,6 +1,7 @@
 'use client';
 
 import { WeightEntry } from '@/lib/types';
+import { STARTING_WEIGHT } from '@/lib/constants';
 import { getTodayDate } from '@/lib/storage';
 import { WeightInput } from './WeightInput';
 import { WeightStats } from './WeightStats';
@@ -23,9 +24,13 @@ export function WeightTab({ entries, setWeight, deleteEntry, getByDate, getStats
   const todayWeight = getByDate(today);
   const stats = getStats();
 
+  const lastKnown = entries.length > 0
+    ? [...entries].sort((a, b) => b.date.localeCompare(a.date))[0].weight
+    : STARTING_WEIGHT;
+
   return (
     <div className="flex flex-col gap-3 px-4 pt-4 pb-4">
-      <WeightInput date={today} value={todayWeight} onSave={w => setWeight(today, w)} />
+      <WeightInput value={todayWeight} lastKnown={lastKnown} onSave={w => setWeight(today, w)} />
       <WeightStats stats={stats} todayWeight={todayWeight} />
       <WeightChart entries={entries} />
       <WeightHistory entries={entries} onDelete={deleteEntry} />

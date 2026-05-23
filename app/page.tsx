@@ -55,11 +55,11 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="fixed top-0 left-0 right-0 z-20 bg-slate-50 border-b border-slate-200">
-        <div
-          className="max-w-md mx-auto flex items-center justify-between px-5 h-14"
-          style={{ paddingTop: 'env(safe-area-inset-top)' }}
-        >
+      <header
+        className="fixed top-0 left-0 right-0 z-20 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <div className="max-w-md mx-auto flex items-center justify-between px-5 h-14">
           <h1 className="text-lg font-bold text-slate-900">Трекер</h1>
           <div className="flex items-center gap-1">
             <button
@@ -82,7 +82,7 @@ export default function Home() {
 
       <div
         className="max-w-md mx-auto"
-        style={{ paddingTop: '56px', paddingBottom: 'calc(64px + env(safe-area-inset-bottom))' }}
+        style={{ paddingTop: 'calc(56px + env(safe-area-inset-top))', paddingBottom: 'calc(64px + env(safe-area-inset-bottom))' }}
       >
         {tab === 'nutrition' && (
           <NutritionTab

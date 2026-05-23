@@ -25,7 +25,7 @@ export function TabBar({ active, onChange }: Props) {
           <button
             key={id}
             onClick={() => onChange(id)}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors active:scale-95 duration-100 ${
               active === id ? 'text-slate-900' : 'text-slate-400'
             }`}
           >

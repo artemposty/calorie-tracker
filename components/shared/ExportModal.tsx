@@ -64,9 +64,9 @@ export function ExportModal({ nutrition, weight, goals, onImport, onClose }: Pro
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 modal-backdrop" onClick={onClose} />
       <div
-        className="relative bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[85dvh] flex flex-col"
+        className="modal-sheet relative bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[85dvh] flex flex-col"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {/* Header */}
