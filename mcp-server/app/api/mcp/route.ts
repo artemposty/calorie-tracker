@@ -43,16 +43,18 @@ function buildServer(): McpServer {
   server.registerTool(
     'add_meals',
     {
-      description: 'Add one or more food/meal entries to the calorie tracker',
+      description:
+        'Add one or more food/meal entries to the calorie tracker. ' +
+        'p, f, c must be per 100g — the server multiplies by grams/100 and stores per-portion values.',
       inputSchema: {
         meals: z
           .array(
             z.object({
               name: z.string().describe('Food name'),
               grams: z.number().positive().describe('Portion weight in grams'),
-              p: z.number().min(0).describe('Protein per 100g'),
-              f: z.number().min(0).describe('Fat per 100g'),
-              c: z.number().min(0).describe('Carbs per 100g'),
+              p: z.number().min(0).describe('Protein per 100g (server converts to per-portion)'),
+              f: z.number().min(0).describe('Fat per 100g (server converts to per-portion)'),
+              c: z.number().min(0).describe('Carbs per 100g (server converts to per-portion)'),
               date: z
                 .string()
                 .regex(/^\d{4}-\d{2}-\d{2}$/)
