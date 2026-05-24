@@ -29,6 +29,7 @@ export function useUserFoods() {
             p: Number(row.p),
             f: Number(row.f),
             c: Number(row.c),
+            defaultGrams: row.default_grams ? Number(row.default_grams) : undefined,
           })));
         }
       });
@@ -37,7 +38,11 @@ export function useUserFoods() {
   function addFood(food: Omit<UserFoodItem, 'id'>) {
     const id = newId();
     setFoods(prev => [{ id, ...food }, ...prev]);
-    sb(supabase.from('user_foods').insert({ id, user_id: USER_ID, ...food }));
+    const { defaultGrams, ...rest } = food;
+    sb(supabase.from('user_foods').insert({
+      id, user_id: USER_ID, ...rest,
+      ...(defaultGrams !== undefined ? { default_grams: defaultGrams } : {}),
+    }));
   }
 
   function deleteFood(id: string) {

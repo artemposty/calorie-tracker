@@ -45,6 +45,7 @@ export interface UserFoodItem {
   p: number;
   f: number;
   c: number;
+  defaultGrams?: number;
 }
 
 export interface AppExport {

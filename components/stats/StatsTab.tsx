@@ -3,92 +3,60 @@
 import { useState, useMemo } from 'react';
 import { FoodEntry, Goals } from '@/lib/types';
 import { getTodayDate, shiftDate, formatShortDate, calcTotals } from '@/lib/storage';
+import { haptic } from '@/lib/haptics';
 import { CalorieChart } from './CalorieChart';
 import { MacroChart } from './MacroChart';
 
-interface DayStats {
-  date: string;
-  displayDate: string;
-  kcal: number;
-  p: number;
-  f: number;
-  c: number;
-}
-
+interface DayStats { date: string; displayDate: string; kcal: number; p: number; f: number; c: number; }
 type Period = '7' | '30' | 'all';
-
-interface Props {
-  nutritionData: Record<string, FoodEntry[]>;
-  goals: Goals;
-}
+interface Props { nutritionData: Record<string, FoodEntry[]>; goals: Goals; }
 
 function buildData(nutritionData: Record<string, FoodEntry[]>, period: Period): DayStats[] {
   const today = getTodayDate();
-
   if (period === 'all') {
-    return Object.keys(nutritionData)
-      .sort()
-      .map(date => {
-        const totals = calcTotals(nutritionData[date] ?? []);
-        return {
-          date,
-          displayDate: formatShortDate(date),
-          kcal: Math.round(totals.kcal),
-          p: Math.round(totals.p),
-          f: Math.round(totals.f),
-          c: Math.round(totals.c),
-        };
-      })
-      .filter(d => d.kcal > 0);
+    return Object.keys(nutritionData).sort().map(date => {
+      const t = calcTotals(nutritionData[date] ?? []);
+      return { date, displayDate: formatShortDate(date), kcal: Math.round(t.kcal), p: Math.round(t.p), f: Math.round(t.f), c: Math.round(t.c) };
+    }).filter(d => d.kcal > 0);
   }
-
   const days = Number(period);
   return Array.from({ length: days }, (_, i) => {
     const date = shiftDate(today, -(days - 1 - i));
-    const totals = calcTotals(nutritionData[date] ?? []);
-    return {
-      date,
-      displayDate: formatShortDate(date),
-      kcal: Math.round(totals.kcal),
-      p: Math.round(totals.p),
-      f: Math.round(totals.f),
-      c: Math.round(totals.c),
-    };
+    const t = calcTotals(nutritionData[date] ?? []);
+    return { date, displayDate: formatShortDate(date), kcal: Math.round(t.kcal), p: Math.round(t.p), f: Math.round(t.f), c: Math.round(t.c) };
   });
 }
 
+const PERIODS: { id: Period; label: string }[] = [
+  { id: '7',   label: '7 дней'    },
+  { id: '30',  label: '30 дней'   },
+  { id: 'all', label: 'Всё время' },
+];
+
 export function StatsTab({ nutritionData, goals }: Props) {
   const [period, setPeriod] = useState<Period>('7');
-
   const data = useMemo(() => buildData(nutritionData, period), [nutritionData, period]);
 
-  const daysWithData = data.filter(d => d.kcal > 0);
-  const avgKcal = daysWithData.length > 0
-    ? Math.round(daysWithData.reduce((s, d) => s + d.kcal, 0) / daysWithData.length)
-    : null;
-  const daysOnTarget = daysWithData.filter(d => d.kcal <= goals.kcal).length;
-  const diffFromGoal = avgKcal !== null ? avgKcal - goals.kcal : null;
-
-  const PERIODS: { id: Period; label: string }[] = [
-    { id: '7', label: '7 дней' },
-    { id: '30', label: '30 дней' },
-    { id: 'all', label: 'Всё время' },
-  ];
+  const daysWithData  = data.filter(d => d.kcal > 0);
+  const avgKcal       = daysWithData.length > 0 ? Math.round(daysWithData.reduce((s, d) => s + d.kcal, 0) / daysWithData.length) : null;
+  const daysOnTarget  = daysWithData.filter(d => d.kcal <= goals.kcal).length;
+  const diffFromGoal  = avgKcal !== null ? avgKcal - goals.kcal : null;
 
   return (
-    <div className="flex flex-col gap-3 px-4 pt-4 pb-4">
+    <div className="flex flex-col gap-3 px-4 pb-4"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 44px) + 16px)' }}>
+
+      <p className="text-xl font-bold" style={{ color: 'var(--text-1)' }}>Статистика</p>
+
       {/* Period selector */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+      <div className="flex gap-1.5 p-1 rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         {PERIODS.map(p => (
-          <button
-            key={p.id}
-            onClick={() => setPeriod(p.id)}
-            className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 active:scale-95 ${
-              period === p.id
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500'
-            }`}
-          >
+          <button key={p.id} onClick={() => { haptic('light'); setPeriod(p.id); }}
+            className="flex-1 py-2 text-sm font-semibold rounded-xl transition-all duration-200 active:scale-95"
+            style={{
+              background: period === p.id ? '#ffffff' : 'transparent',
+              color: period === p.id ? '#0a0a0b' : 'var(--text-4)',
+            }}>
             {p.label}
           </button>
         ))}
@@ -96,42 +64,33 @@ export function StatsTab({ nutritionData, goals }: Props) {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl p-4 shadow-sm card-appear">
-          <p className="text-xs text-slate-400 mb-1">Средний каллораж</p>
+        <div className="rounded-2xl p-4 card-appear" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <p className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-4)' }}>Средний ккал</p>
           {avgKcal !== null ? (
             <>
-              <p className="text-2xl font-bold tabular-nums text-slate-900">{avgKcal}</p>
-              <p className="text-xs text-slate-400 mt-0.5">ккал/день</p>
-              <p className={`text-xs font-medium mt-1.5 ${
-                diffFromGoal! > 0 ? 'text-red-500' : 'text-emerald-600'
-              }`}>
+              <p className="text-3xl font-light tabular-nums" style={{ color: 'var(--text-1)' }}>{avgKcal}</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>ккал/день</p>
+              <p className="text-xs font-semibold mt-1.5" style={{ color: diffFromGoal! > 0 ? 'var(--danger)' : 'var(--success)' }}>
                 {diffFromGoal! > 0 ? `+${diffFromGoal}` : diffFromGoal} от цели
               </p>
             </>
-          ) : (
-            <p className="text-sm text-slate-400 mt-2">Нет данных</p>
-          )}
+          ) : <p className="text-sm mt-2" style={{ color: 'var(--text-4)' }}>Нет данных</p>}
         </div>
 
-        <div className="bg-white rounded-2xl p-4 shadow-sm card-appear">
-          <p className="text-xs text-slate-400 mb-1">Дней в норме</p>
+        <div className="rounded-2xl p-4 card-appear" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <p className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-4)' }}>Дней в норме</p>
           {daysWithData.length > 0 ? (
             <>
-              <p className="text-2xl font-bold tabular-nums text-slate-900">
-                {daysOnTarget}
-                <span className="text-base font-normal text-slate-400"> / {daysWithData.length}</span>
+              <p className="text-3xl font-light tabular-nums" style={{ color: 'var(--text-1)' }}>
+                {daysOnTarget}<span className="text-lg" style={{ color: 'var(--text-4)' }}>/{daysWithData.length}</span>
               </p>
-              <p className="text-xs text-slate-400 mt-0.5">≤ {goals.kcal} ккал</p>
-              <div className="mt-1.5 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-emerald-500 rounded-full transition-[width] duration-500"
-                  style={{ width: `${daysWithData.length > 0 ? (daysOnTarget / daysWithData.length) * 100 : 0}%` }}
-                />
+              <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>≤ {goals.kcal} ккал</p>
+              <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>
+                <div className="h-full rounded-full transition-[width] duration-500"
+                  style={{ width: `${daysWithData.length > 0 ? (daysOnTarget / daysWithData.length) * 100 : 0}%`, background: 'var(--success)' }} />
               </div>
             </>
-          ) : (
-            <p className="text-sm text-slate-400 mt-2">Нет данных</p>
-          )}
+          ) : <p className="text-sm mt-2" style={{ color: 'var(--text-4)' }}>Нет данных</p>}
         </div>
       </div>
 

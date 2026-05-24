@@ -236,6 +236,34 @@ function buildServer(): McpServer {
     },
   );
 
+  // ── add_food_item ─────────────────────────────────────────────────────────
+  server.registerTool(
+    'add_food_item',
+    {
+      description: 'Add a food item to the personal food database (for quick re-use when logging meals)',
+      inputSchema: {
+        name: z.string().describe('Food name'),
+        p: z.number().min(0).describe('Protein per 100g'),
+        f: z.number().min(0).describe('Fat per 100g'),
+        c: z.number().min(0).describe('Carbs per 100g'),
+        kcal: z.number().min(0).optional().describe('Calories per 100g (calculated from p/f/c if omitted)'),
+        default_grams: z.number().positive().optional().describe('Default portion size in grams'),
+      },
+    },
+    async ({ name, p, f, c, kcal, default_grams }) => {
+      try {
+        const computedKcal = kcal ?? Math.round(p * 4 + f * 9 + c * 4);
+        const result = await trackerFetch('/api/foods', {
+          method: 'POST',
+          body: JSON.stringify({ name, p, f, c, kcal: computedKcal, default_grams }),
+        });
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: String(e) }] };
+      }
+    },
+  );
+
   // ── resources ────────────────────────────────────────────────────────────
   server.registerResource(
     'today-summary',

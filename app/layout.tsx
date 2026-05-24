@@ -19,7 +19,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#f8fafc',
+  themeColor: '#0a0a0b',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -28,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.svg" />
       </head>
-      <body className="min-h-full bg-slate-50 antialiased">
+      <body className="min-h-full antialiased" style={{ background: '#0a0a0b' }}>
         {children}
         <Script id="sw-register" strategy="afterInteractive">
           {`if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js'); }`}

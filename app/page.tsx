@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, Database } from 'lucide-react';
 import { Goals, AppExport } from '@/lib/types';
 import { DEFAULT_GOALS } from '@/lib/constants';
 import { supabase, USER_ID } from '@/lib/supabase';
@@ -9,21 +8,19 @@ import { useNutrition } from '@/hooks/useNutrition';
 import { useWeight } from '@/hooks/useWeight';
 import { LoadingScreen } from '@/components/shared/LoadingScreen';
 import { TabBar, Tab } from '@/components/shared/TabBar';
-import { ExportModal } from '@/components/shared/ExportModal';
-import { SettingsModal } from '@/components/settings/SettingsModal';
 import { NutritionTab } from '@/components/nutrition/NutritionTab';
 import { WeightTab } from '@/components/weight/WeightTab';
 import { StatsTab } from '@/components/stats/StatsTab';
+import { SettingsTab } from '@/components/settings/SettingsTab';
+import { PullToRefresh } from '@/components/shared/PullToRefresh';
 
 export default function Home() {
-  const [tab, setTab] = useState<Tab>('nutrition');
-  const [showExport, setShowExport] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [goals, setGoals] = useState<Goals>(DEFAULT_GOALS);
+  const [tab,         setTab]         = useState<Tab>('nutrition');
+  const [goals,       setGoals]       = useState<Goals>(DEFAULT_GOALS);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
 
   const nutrition = useNutrition();
-  const weight = useWeight();
+  const weight    = useWeight();
 
   useEffect(() => {
     supabase
@@ -32,9 +29,7 @@ export default function Home() {
       .eq('user_id', USER_ID)
       .single()
       .then(({ data }) => {
-        if (data) {
-          setGoals({ kcal: data.kcal, protein: data.protein, fat: data.fat, carbs: data.carbs });
-        }
+        if (data) setGoals({ kcal: data.kcal, protein: data.protein, fat: data.fat, carbs: data.carbs });
         setGoalsLoaded(true);
       });
   }, []);
@@ -55,36 +50,9 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header
-        className="fixed top-0 left-0 right-0 z-20 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
-        <div className="max-w-md mx-auto flex items-center justify-between px-5 h-14">
-          <h1 className="text-lg font-bold text-slate-900">Трекер</h1>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setShowExport(true)}
-              className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors"
-              aria-label="Экспорт/Импорт"
-            >
-              <Database size={18} />
-            </button>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors"
-              aria-label="Настройки"
-            >
-              <Settings size={18} />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div
-        className="max-w-md mx-auto"
-        style={{ paddingTop: 'calc(56px + env(safe-area-inset-top))', paddingBottom: 'calc(max(env(safe-area-inset-bottom), 16px) + 68px)' }}
-      >
+    <div style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--text-1)' }}>
+      <PullToRefresh>
+      <div style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom), 12px) + 68px)' }}>
         {tab === 'nutrition' && (
           <NutritionTab
             goals={goals}
@@ -104,32 +72,21 @@ export default function Home() {
           />
         )}
         {tab === 'stats' && (
-          <StatsTab
-            nutritionData={nutrition.data}
+          <StatsTab nutritionData={nutrition.data} goals={goals} />
+        )}
+        {tab === 'settings' && (
+          <SettingsTab
             goals={goals}
+            onSave={saveGoals}
+            nutrition={nutrition.data}
+            weight={weight.entries}
+            onImport={handleImport}
           />
         )}
       </div>
+      </PullToRefresh>
 
       <TabBar active={tab} onChange={setTab} />
-
-      {showExport && (
-        <ExportModal
-          nutrition={nutrition.data}
-          weight={weight.entries}
-          goals={goals}
-          onImport={handleImport}
-          onClose={() => setShowExport(false)}
-        />
-      )}
-
-      {showSettings && (
-        <SettingsModal
-          goals={goals}
-          onSave={saveGoals}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
     </div>
   );
 }

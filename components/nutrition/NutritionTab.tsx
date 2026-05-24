@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
 import { Goals, FoodEntry } from '@/lib/types';
 import { getTodayDate, shiftDate, calcTotals } from '@/lib/storage';
+import { haptic } from '@/lib/haptics';
 import { DayHeader } from './DayHeader';
 import { CalorieDisplay } from './CalorieDisplay';
 import { MacroProgress } from './MacroProgress';
@@ -25,13 +25,15 @@ export function NutritionTab({ goals, getDayEntries, addEntry, addEntries, delet
   const entries = getDayEntries(date);
   const totals = calcTotals(entries);
 
-  function prevDay() { setDate(d => shiftDate(d, -1)); }
-  function nextDay() { setDate(d => shiftDate(d, 1)); }
-
   return (
     <>
-      <div className="flex flex-col gap-3 px-4 pt-2 pb-4">
-        <DayHeader date={date} onPrev={prevDay} onNext={nextDay} />
+      <div className="flex flex-col gap-4">
+        <DayHeader
+          date={date}
+          onPrev={() => setDate(d => shiftDate(d, -1))}
+          onNext={() => setDate(d => shiftDate(d, 1))}
+          onDateChange={setDate}
+        />
         <CalorieDisplay totals={totals} goals={goals} />
         <MacroProgress totals={totals} goals={goals} />
         <MealList entries={entries} onDelete={id => deleteEntry(date, id)} />
@@ -39,18 +41,26 @@ export function NutritionTab({ goals, getDayEntries, addEntry, addEntries, delet
 
       {/* FAB */}
       <button
-        onClick={() => setShowAdd(true)}
-        className="fixed right-5 z-10 w-14 h-14 bg-slate-900 text-white rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform duration-100"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}
+        onClick={() => { haptic('medium'); setShowAdd(true); }}
+        className="fixed z-10 flex items-center justify-center active:scale-90 transition-transform duration-100"
+        style={{
+          right: 20,
+          bottom: 'calc(max(env(safe-area-inset-bottom), 12px) + 76px)',
+          width: 56, height: 56, borderRadius: 28,
+          background: '#ffffff',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+        }}
         aria-label="Добавить приём пищи"
       >
-        <Plus size={26} strokeWidth={2} />
+        <svg width="26" height="26" fill="none" stroke="#0a0a0b" strokeWidth="2.5" viewBox="0 0 24 24">
+          <line x1="12" y1="5" x2="12" y2="19" strokeLinecap="round" />
+          <line x1="5" y1="12" x2="19" y2="12" strokeLinecap="round" />
+        </svg>
       </button>
 
       {showAdd && (
         <AddMealModal
           onAdd={e => addEntry(date, e)}
-          onAddMany={es => addEntries(date, es)}
           onClose={() => setShowAdd(false)}
         />
       )}
