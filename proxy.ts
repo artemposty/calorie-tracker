@@ -4,8 +4,8 @@ import type { NextRequest } from 'next/server';
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Let login and auth API routes through
-  if (pathname.startsWith('/login') || pathname.startsWith('/api/auth')) {
+  // API routes have their own Bearer token auth — skip cookie check
+  if (pathname.startsWith('/api/') || pathname.startsWith('/login')) {
     return NextResponse.next();
   }
 
