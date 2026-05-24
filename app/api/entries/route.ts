@@ -61,10 +61,16 @@ export async function POST(request: Request) {
 
   const today = getTodayDate();
   const rows = (body as EntryInput[]).map(item => {
-    const p = Number(item.p ?? 0);
-    const f = Number(item.f ?? 0);
-    const c = Number(item.c ?? 0);
-    const kcal = Math.round(p * 4 + f * 9 + c * 4);
+    const p100   = Number(item.p ?? 0);
+    const f100   = Number(item.f ?? 0);
+    const c100   = Number(item.c ?? 0);
+    const grams  = Number(item.grams ?? 0);
+    const factor = grams / 100;
+    // Store per-portion values (Variant A)
+    const p    = Math.round(p100 * factor * 10) / 10;
+    const f    = Math.round(f100 * factor * 10) / 10;
+    const c    = Math.round(c100 * factor * 10) / 10;
+    const kcal = Math.round((p100 * 4 + f100 * 9 + c100 * 4) * factor);
     const date =
       typeof item.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.date)
         ? item.date : today;
@@ -73,7 +79,7 @@ export async function POST(request: Request) {
       user_id: USER_ID(),
       date,
       name: String(item.name ?? 'Продукт'),
-      grams: Number(item.grams ?? 0),
+      grams,
       kcal, p, f, c,
     };
   });
