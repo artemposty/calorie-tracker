@@ -1,26 +1,32 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { Goals, AppExport } from '@/lib/types';
 import { DEFAULT_GOALS } from '@/lib/constants';
 import { supabase, USER_ID } from '@/lib/supabase';
 import { useNutrition } from '@/hooks/useNutrition';
 import { useWeight } from '@/hooks/useWeight';
+import { useEffect } from 'react';
 import { LoadingScreen } from '@/components/shared/LoadingScreen';
-import { TabBar, Tab } from '@/components/shared/TabBar';
+import { Drawer, SwipeEdgeDetector, Module } from '@/components/shared/Drawer';
 import { NutritionTab } from '@/components/nutrition/NutritionTab';
 import { WeightTab } from '@/components/weight/WeightTab';
 import { StatsTab } from '@/components/stats/StatsTab';
 import { SettingsTab } from '@/components/settings/SettingsTab';
+import { WorkoutTab } from '@/components/workout/WorkoutTab';
 import { PullToRefresh } from '@/components/shared/PullToRefresh';
 
 export default function Home() {
-  const [tab,         setTab]         = useState<Tab>('nutrition');
+  const [module,      setModule]      = useState<Module>('nutrition');
+  const [drawerOpen,  setDrawerOpen]  = useState(false);
   const [goals,       setGoals]       = useState<Goals>(DEFAULT_GOALS);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
 
   const nutrition = useNutrition();
   const weight    = useWeight();
+
+  const openDrawer  = useCallback(() => setDrawerOpen(true),  []);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
   useEffect(() => {
     supabase
@@ -51,42 +57,47 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--text-1)' }}>
-      <PullToRefresh>
-      <div style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom), 12px) + 68px)' }}>
-        {tab === 'nutrition' && (
-          <NutritionTab
-            goals={goals}
-            getDayEntries={nutrition.getDayEntries}
-            addEntry={nutrition.addEntry}
-            addEntries={nutrition.addEntries}
-            deleteEntry={nutrition.deleteEntry}
-          />
-        )}
-        {tab === 'weight' && (
-          <WeightTab
-            entries={weight.entries}
-            setWeight={weight.setWeight}
-            deleteEntry={weight.deleteEntry}
-            getByDate={weight.getByDate}
-            getStats={weight.getStats}
-          />
-        )}
-        {tab === 'stats' && (
-          <StatsTab nutritionData={nutrition.data} goals={goals} />
-        )}
-        {tab === 'settings' && (
-          <SettingsTab
-            goals={goals}
-            onSave={saveGoals}
-            nutrition={nutrition.data}
-            weight={weight.entries}
-            onImport={handleImport}
-          />
-        )}
-      </div>
-      </PullToRefresh>
+      <SwipeEdgeDetector onOpen={openDrawer} />
+      <Drawer open={drawerOpen} active={module} onSelect={setModule} onClose={closeDrawer} />
 
-      <TabBar active={tab} onChange={setTab} />
+      <PullToRefresh>
+        <div style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 20px)' }}>
+          {module === 'nutrition' && (
+            <NutritionTab
+              goals={goals}
+              getDayEntries={nutrition.getDayEntries}
+              addEntry={nutrition.addEntry}
+              addEntries={nutrition.addEntries}
+              deleteEntry={nutrition.deleteEntry}
+              onMenuOpen={openDrawer}
+            />
+          )}
+          {module === 'workout' && <WorkoutTab onMenuOpen={openDrawer} />}
+          {module === 'weight' && (
+            <WeightTab
+              entries={weight.entries}
+              setWeight={weight.setWeight}
+              deleteEntry={weight.deleteEntry}
+              getByDate={weight.getByDate}
+              getStats={weight.getStats}
+              onMenuOpen={openDrawer}
+            />
+          )}
+          {module === 'stats' && (
+            <StatsTab nutritionData={nutrition.data} goals={goals} onMenuOpen={openDrawer} />
+          )}
+          {module === 'settings' && (
+            <SettingsTab
+              goals={goals}
+              onSave={saveGoals}
+              nutrition={nutrition.data}
+              weight={weight.entries}
+              onImport={handleImport}
+              onMenuOpen={openDrawer}
+            />
+          )}
+        </div>
+      </PullToRefresh>
     </div>
   );
 }

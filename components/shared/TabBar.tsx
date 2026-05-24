@@ -2,7 +2,7 @@
 
 import { haptic } from '@/lib/haptics';
 
-export type Tab = 'nutrition' | 'weight' | 'stats' | 'settings';
+export type Tab = 'nutrition' | 'weight' | 'workout' | 'stats' | 'settings';
 
 interface Props {
   active: Tab;
@@ -32,6 +32,16 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
         <line x1="3" y1="8" x2="21" y2="8" strokeLinecap="round" />
         <path d="M3 8 L5 14 Q6 16 7 14 L9 8" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M15 8 L17 14 Q18 16 19 14 L21 8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'workout',
+    label: 'Тренировка',
+    icon: (
+      <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+        <path d="M6.5 6.5h11M6.5 17.5h11M3 12h2m14 0h2" strokeLinecap="round" />
+        <path d="M5 9.5l-2 2.5 2 2.5M19 9.5l2 2.5-2 2.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
@@ -74,17 +84,19 @@ export function TabBar({ active, onChange }: Props) {
           <button
             key={id}
             onClick={() => { haptic('light'); onChange(id); }}
-            className="flex flex-col items-center gap-0.5 py-2.5 px-3 flex-1 active:scale-90 transition-transform duration-100"
+            className="flex flex-col items-center gap-0.5 py-2 px-2 flex-1 active:scale-90 transition-transform duration-100"
           >
             <span style={{ color: isActive ? '#ffffff' : '#3f3f46', transition: 'color 0.15s' }}>
               {icon}
             </span>
-            <span
-              className="text-[10px] font-medium tracking-wide"
-              style={{ color: isActive ? '#ffffff' : '#3f3f46', transition: 'color 0.15s' }}
-            >
-              {label}
-            </span>
+            {isActive && (
+              <span
+                className="text-[10px] font-medium tracking-wide"
+                style={{ color: '#ffffff' }}
+              >
+                {label}
+              </span>
+            )}
           </button>
         );
       })}

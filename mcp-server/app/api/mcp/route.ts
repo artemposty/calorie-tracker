@@ -266,6 +266,187 @@ function buildServer(): McpServer {
     },
   );
 
+  // ── log_set ──────────────────────────────────────────────────────────────
+  server.registerTool(
+    'log_set',
+    {
+      description:
+        'Log a single workout set (exercise + weight + reps). ' +
+        'Use list_exercises to find the exercise ID first. ' +
+        'weight is in kg, reps is an integer, rpe is optional (1-10 scale).',
+      inputSchema: {
+        exercise_id: z.string().describe('Exercise ID from list_exercises'),
+        weight: z.number().min(0).describe('Weight in kg (0 for bodyweight)'),
+        reps: z.number().int().min(1).describe('Number of reps'),
+        rpe: z.number().min(1).max(10).optional().describe('Rate of Perceived Exertion (1-10)'),
+        date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional()
+          .describe('Date YYYY-MM-DD (default: today)'),
+        notes: z.string().optional().describe('Optional notes for this set'),
+      },
+    },
+    async ({ exercise_id, weight, reps, rpe, date, notes }) => {
+      try {
+        const result = await trackerFetch('/api/sets', {
+          method: 'POST',
+          body: JSON.stringify({ exerciseId: exercise_id, weight, reps, rpe, date, notes }),
+        });
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: String(e) }] };
+      }
+    },
+  );
+
+  // ── get_today_workout ─────────────────────────────────────────────────────
+  server.registerTool(
+    'get_today_workout',
+    {
+      description:
+        "Get today's workout: sets grouped by exercise, total tonnage, and this-week muscle volume summary.",
+    },
+    async () => {
+      try {
+        const result = await trackerFetch('/api/training/dashboard');
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: String(e) }] };
+      }
+    },
+  );
+
+  // ── get_last_session ─────────────────────────────────────────────────────
+  server.registerTool(
+    'get_last_session',
+    {
+      description: 'Get the sets from the most recent session for a given exercise (useful for progressive overload hints).',
+      inputSchema: {
+        exercise_id: z.string().describe('Exercise ID'),
+      },
+    },
+    async ({ exercise_id }) => {
+      try {
+        const result = await trackerFetch(`/api/training/last-session?exercise_id=${encodeURIComponent(exercise_id)}`);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: String(e) }] };
+      }
+    },
+  );
+
+  // ── get_exercise_progress ─────────────────────────────────────────────────
+  server.registerTool(
+    'get_exercise_progress',
+    {
+      description:
+        'Get e1RM (estimated 1-rep max via Epley formula) progress over time for an exercise. Returns per-session best e1RM and all-time PR.',
+      inputSchema: {
+        exercise_id: z.string().describe('Exercise ID'),
+        days: z
+          .number()
+          .int()
+          .min(1)
+          .max(365)
+          .default(90)
+          .describe('Look-back window in days (default: 90)'),
+      },
+    },
+    async ({ exercise_id, days }) => {
+      try {
+        const result = await trackerFetch(
+          `/api/training/exercise-progress?exercise_id=${encodeURIComponent(exercise_id)}&days=${days}`,
+        );
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: String(e) }] };
+      }
+    },
+  );
+
+  // ── get_weekly_volume ─────────────────────────────────────────────────────
+  server.registerTool(
+    'get_weekly_volume',
+    {
+      description:
+        'Get weekly training volume per muscle group (sets and tonnage). Primary muscle = 1.0 set, secondary = 0.5 set.',
+      inputSchema: {
+        weeks: z
+          .number()
+          .int()
+          .min(1)
+          .max(12)
+          .default(1)
+          .describe('Number of weeks to include (default: 1 = current week)'),
+      },
+    },
+    async ({ weeks }) => {
+      try {
+        const result = await trackerFetch(`/api/training/weekly-volume?weeks=${weeks}`);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: String(e) }] };
+      }
+    },
+  );
+
+  // ── list_exercises ────────────────────────────────────────────────────────
+  server.registerTool(
+    'list_exercises',
+    {
+      description: 'List all available exercises (system + custom). Returns id, name, primaryMuscle, equipment.',
+    },
+    async () => {
+      try {
+        const result = await trackerFetch('/api/exercises');
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: String(e) }] };
+      }
+    },
+  );
+
+  // ── add_exercise ──────────────────────────────────────────────────────────
+  server.registerTool(
+    'add_exercise',
+    {
+      description: 'Add a custom exercise to the exercise library.',
+      inputSchema: {
+        name: z.string().describe('Exercise name'),
+        primary_muscle: z
+          .enum(['chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'glutes', 'core', 'calves', 'forearms', 'lower_back'])
+          .describe('Primary muscle group'),
+        secondary_muscles: z
+          .array(z.enum(['chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'glutes', 'core', 'calves', 'forearms', 'lower_back']))
+          .optional()
+          .describe('Secondary muscle groups'),
+        equipment: z
+          .enum(['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight', 'other'])
+          .optional()
+          .describe('Equipment type (default: other)'),
+        notes: z.string().optional().describe('Optional notes'),
+      },
+    },
+    async ({ name, primary_muscle, secondary_muscles, equipment, notes }) => {
+      try {
+        const result = await trackerFetch('/api/exercises', {
+          method: 'POST',
+          body: JSON.stringify({
+            name,
+            primaryMuscle: primary_muscle,
+            secondaryMuscles: secondary_muscles ?? [],
+            equipment: equipment ?? 'other',
+            notes,
+          }),
+        });
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: String(e) }] };
+      }
+    },
+  );
+
   // ── resources ────────────────────────────────────────────────────────────
   server.registerResource(
     'today-summary',

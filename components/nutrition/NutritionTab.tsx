@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Goals, FoodEntry } from '@/lib/types';
 import { getTodayDate, shiftDate, calcTotals } from '@/lib/storage';
 import { haptic } from '@/lib/haptics';
-import { DayHeader } from './DayHeader';
+import { ModuleHeader } from '@/components/shared/ModuleHeader';
 import { CalorieDisplay } from './CalorieDisplay';
 import { MacroProgress } from './MacroProgress';
 import { MealList } from './MealList';
@@ -16,9 +16,10 @@ interface Props {
   addEntry: (date: string, entry: Omit<FoodEntry, 'id' | 'time'>) => void;
   addEntries: (date: string, entries: Omit<FoodEntry, 'id' | 'time'>[]) => void;
   deleteEntry: (date: string, id: string) => void;
+  onMenuOpen: () => void;
 }
 
-export function NutritionTab({ goals, getDayEntries, addEntry, addEntries, deleteEntry }: Props) {
+export function NutritionTab({ goals, getDayEntries, addEntry, addEntries, deleteEntry, onMenuOpen }: Props) {
   const [date, setDate] = useState(getTodayDate);
   const [showAdd, setShowAdd] = useState(false);
 
@@ -28,7 +29,8 @@ export function NutritionTab({ goals, getDayEntries, addEntry, addEntries, delet
   return (
     <>
       <div className="flex flex-col gap-4">
-        <DayHeader
+        <ModuleHeader
+          onMenuOpen={onMenuOpen}
           date={date}
           onPrev={() => setDate(d => shiftDate(d, -1))}
           onNext={() => setDate(d => shiftDate(d, 1))}
@@ -45,7 +47,7 @@ export function NutritionTab({ goals, getDayEntries, addEntry, addEntries, delet
         className="fixed z-10 flex items-center justify-center active:scale-90 transition-transform duration-100"
         style={{
           right: 20,
-          bottom: 'calc(max(env(safe-area-inset-bottom), 12px) + 76px)',
+          bottom: 'calc(max(env(safe-area-inset-bottom), 12px) + 16px)',
           width: 56, height: 56, borderRadius: 28,
           background: '#ffffff',
           boxShadow: '0 4px 24px rgba(0,0,0,0.5)',

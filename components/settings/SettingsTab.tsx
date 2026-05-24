@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Goals, AppExport } from '@/lib/types';
 import { haptic } from '@/lib/haptics';
+import { ModuleHeader } from '@/components/shared/ModuleHeader';
 import { ExportModal } from '@/components/shared/ExportModal';
 import { WeightEntry, FoodEntry } from '@/lib/types';
 
@@ -12,6 +13,7 @@ interface Props {
   nutrition: Record<string, FoodEntry[]>;
   weight: WeightEntry[];
   onImport: (data: AppExport) => void;
+  onMenuOpen: () => void;
 }
 
 function num(v: string) { return parseInt(v, 10) || 0; }
@@ -38,7 +40,7 @@ function FieldRow({ label, unit, color, value, onChange }: {
   );
 }
 
-export function SettingsTab({ goals, onSave, nutrition, weight, onImport }: Props) {
+export function SettingsTab({ goals, onSave, nutrition, weight, onImport, onMenuOpen }: Props) {
   const [kcal,    setKcal]    = useState(String(goals.kcal));
   const [protein, setProtein] = useState(String(goals.protein));
   const [fat,     setFat]     = useState(String(goals.fat));
@@ -61,10 +63,8 @@ export function SettingsTab({ goals, onSave, nutrition, weight, onImport }: Prop
   ];
 
   return (
-    <div className="flex flex-col gap-4 px-4 pb-8"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top, 44px) + 16px)' }}>
-
-      <p className="text-xl font-bold" style={{ color: 'var(--text-1)' }}>Настройки</p>
+    <div className="flex flex-col gap-4 px-4 pb-8">
+      <ModuleHeader title="Настройки" onMenuOpen={onMenuOpen} />
 
       {/* Goals */}
       <div>
