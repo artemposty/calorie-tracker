@@ -76,7 +76,7 @@ export function useWorkout(date: string) {
     exerciseId: string;
     weight: number;
     reps: number;
-    rpe?: number;
+    rpe: number;
     notes?: string;
   }) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;

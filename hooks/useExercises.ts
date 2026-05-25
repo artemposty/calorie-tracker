@@ -55,5 +55,34 @@ export function useExercises() {
     return !error;
   }, [load]);
 
-  return { exercises, loading, reload: load, addExercise };
+  const deleteExercise = useCallback(async (id: string) => {
+    const { error } = await supabase
+      .from('exercises')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', USER_ID)
+      .eq('is_system', false);
+    if (!error) setExercises(prev => prev.filter(e => e.id !== id));
+    return !error;
+  }, []);
+
+  const updateExercise = useCallback(async (id: string, updates: {
+    name?: string;
+    primaryMuscle?: Exercise['primaryMuscle'];
+    secondaryMuscles?: Exercise['secondaryMuscles'];
+    equipment?: Exercise['equipment'];
+    notes?: string | null;
+  }) => {
+    const db: Record<string, unknown> = {};
+    if (updates.name !== undefined)             db.name              = updates.name;
+    if (updates.primaryMuscle !== undefined)    db.primary_muscle    = updates.primaryMuscle;
+    if (updates.secondaryMuscles !== undefined) db.secondary_muscles = updates.secondaryMuscles;
+    if (updates.equipment !== undefined)        db.equipment         = updates.equipment;
+    if (updates.notes !== undefined)            db.notes             = updates.notes;
+    const { error } = await supabase.from('exercises').update(db).eq('id', id).eq('user_id', USER_ID);
+    if (!error) await load();
+    return !error;
+  }, [load]);
+
+  return { exercises, loading, reload: load, addExercise, deleteExercise, updateExercise };
 }

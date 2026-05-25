@@ -22,7 +22,7 @@ export function WorkoutTab({ onMenuOpen }: Props) {
   const [subTab, setSubTab] = useState<SubTab>('today');
   const [date, setDate] = useState(getTodayDate);
   const { byExercise, totalSets, totalTonnage, loading, addSet, deleteSet } = useWorkout(date);
-  const { exercises, loading: exLoading } = useExercises();
+  const { exercises, loading: exLoading, addExercise, updateExercise, deleteExercise } = useExercises();
   const { volume, loading: volLoading } = useWeeklyVolume();
   const [showAdd, setShowAdd] = useState(false);
 
@@ -73,7 +73,13 @@ export function WorkoutTab({ onMenuOpen }: Props) {
         )}
 
         {subTab === 'exercises' && (
-          <ExercisesListTab exercises={exercises} loading={exLoading} />
+          <ExercisesListTab
+            exercises={exercises}
+            loading={exLoading}
+            onAdd={addExercise}
+            onUpdate={updateExercise}
+            onDelete={deleteExercise}
+          />
         )}
 
         {subTab === 'stats' && <WorkoutStatsTab />}
