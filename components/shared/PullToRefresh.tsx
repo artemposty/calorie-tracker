@@ -3,13 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { haptic } from '@/lib/haptics';
 
-const THRESHOLD = 80;
+const THRESHOLD = 100;
+const LOCK_DISTANCE = 12; // px before direction is determined
 
 export function PullToRefresh({ children }: { children: React.ReactNode }) {
   const [pull, setPull]       = useState(0);   // 0..1 progress
   const [triggered, setTriggered] = useState(false);
-  const startY = useRef(0);
-  const pulling = useRef(false);
+  const startY   = useRef(0);
+  const startX   = useRef(0);
+  const pulling  = useRef(false);
+  const locked   = useRef(false); // true = confirmed vertical, false = waiting / cancelled
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -18,15 +21,29 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
 
     function onTouchStart(e: TouchEvent) {
       if (window.scrollY > 0) return;
-      startY.current = e.touches[0].clientY;
+      startY.current  = e.touches[0].clientY;
+      startX.current  = e.touches[0].clientX;
       pulling.current = true;
+      locked.current  = false;
     }
 
     function onTouchMove(e: TouchEvent) {
       if (!pulling.current) return;
       const dy = e.touches[0].clientY - startY.current;
+      const dx = Math.abs(e.touches[0].clientX - startX.current);
+
+      // Determine direction once enough movement has happened
+      if (!locked.current) {
+        const dist = Math.sqrt(dy * dy + dx * dx);
+        if (dist < LOCK_DISTANCE) return; // not enough movement yet
+        if (dx > dy || dy <= 0) {         // horizontal-dominant or upward → cancel
+          pulling.current = false;
+          return;
+        }
+        locked.current = true;
+      }
+
       if (dy <= 0) { setPull(0); return; }
-      // Only handle if we're still at the top
       if (window.scrollY > 0) { pulling.current = false; setPull(0); return; }
       const progress = Math.min(dy / THRESHOLD, 1.4);
       setPull(progress);

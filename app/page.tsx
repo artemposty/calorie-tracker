@@ -11,7 +11,6 @@ import { LoadingScreen } from '@/components/shared/LoadingScreen';
 import { Drawer, SwipeEdgeDetector, Module } from '@/components/shared/Drawer';
 import { NutritionTab } from '@/components/nutrition/NutritionTab';
 import { WeightTab } from '@/components/weight/WeightTab';
-import { StatsTab } from '@/components/stats/StatsTab';
 import { SettingsTab } from '@/components/settings/SettingsTab';
 import { WorkoutTab } from '@/components/workout/WorkoutTab';
 import { PullToRefresh } from '@/components/shared/PullToRefresh';
@@ -65,6 +64,7 @@ export default function Home() {
           {module === 'nutrition' && (
             <NutritionTab
               goals={goals}
+              nutritionData={nutrition.data}
               getDayEntries={nutrition.getDayEntries}
               addEntry={nutrition.addEntry}
               addEntries={nutrition.addEntries}
@@ -82,9 +82,6 @@ export default function Home() {
               getStats={weight.getStats}
               onMenuOpen={openDrawer}
             />
-          )}
-          {module === 'stats' && (
-            <StatsTab nutritionData={nutrition.data} goals={goals} onMenuOpen={openDrawer} />
           )}
           {module === 'settings' && (
             <SettingsTab

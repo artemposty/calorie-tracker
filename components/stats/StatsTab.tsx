@@ -4,13 +4,12 @@ import { useState, useMemo } from 'react';
 import { FoodEntry, Goals } from '@/lib/types';
 import { getTodayDate, shiftDate, formatShortDate, calcTotals } from '@/lib/storage';
 import { haptic } from '@/lib/haptics';
-import { ModuleHeader } from '@/components/shared/ModuleHeader';
 import { CalorieChart } from './CalorieChart';
 import { MacroChart } from './MacroChart';
 
 interface DayStats { date: string; displayDate: string; kcal: number; p: number; f: number; c: number; }
 type Period = '7' | '30' | 'all';
-interface Props { nutritionData: Record<string, FoodEntry[]>; goals: Goals; onMenuOpen: () => void; }
+interface Props { nutritionData: Record<string, FoodEntry[]>; goals: Goals; }
 
 function buildData(nutritionData: Record<string, FoodEntry[]>, period: Period): DayStats[] {
   const today = getTodayDate();
@@ -34,7 +33,7 @@ const PERIODS: { id: Period; label: string }[] = [
   { id: 'all', label: 'Всё время' },
 ];
 
-export function StatsTab({ nutritionData, goals, onMenuOpen }: Props) {
+export function StatsTab({ nutritionData, goals }: Props) {
   const [period, setPeriod] = useState<Period>('7');
   const data = useMemo(() => buildData(nutritionData, period), [nutritionData, period]);
 
@@ -44,8 +43,7 @@ export function StatsTab({ nutritionData, goals, onMenuOpen }: Props) {
   const diffFromGoal  = avgKcal !== null ? avgKcal - goals.kcal : null;
 
   return (
-    <div className="flex flex-col gap-3 px-4 pb-4">
-      <ModuleHeader title="Статистика" onMenuOpen={onMenuOpen} />
+    <div className="flex flex-col gap-3 px-4 pb-4 pt-2">
 
       {/* Period selector */}
       <div className="flex gap-1.5 p-1 rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>

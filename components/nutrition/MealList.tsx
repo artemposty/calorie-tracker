@@ -12,6 +12,7 @@ interface SwipeRowProps {
 function SwipeRow({ children, onDelete }: SwipeRowProps) {
   const [offset, setOffset] = useState(0);
   const [snapping, setSnapping] = useState(false);
+  const [awaitConfirm, setAwaitConfirm] = useState(false);
   const startX = useRef(0);
   const startY = useRef(0);
   const direction = useRef<'h' | 'v' | null>(null);
@@ -42,6 +43,7 @@ function SwipeRow({ children, onDelete }: SwipeRowProps) {
   }, []);
 
   function onTouchStart(e: React.TouchEvent) {
+    if (awaitConfirm) return;
     startX.current = e.touches[0].clientX;
     startY.current = e.touches[0].clientY;
     direction.current = null;
@@ -51,13 +53,28 @@ function SwipeRow({ children, onDelete }: SwipeRowProps) {
   function onTouchEnd() {
     setSnapping(true);
     if (offset <= -65) {
-      haptic('heavy');
+      haptic('medium');
       setOffset(-80);
-      setTimeout(onDelete, 220);
+      setAwaitConfirm(true);
     } else {
       if (offset < -8) haptic('light');
       setOffset(0);
+      setAwaitConfirm(false);
     }
+  }
+
+  function handleDelete() {
+    haptic('heavy');
+    setSnapping(true);
+    setOffset(0);
+    setAwaitConfirm(false);
+    onDelete();
+  }
+
+  function handleCancel() {
+    setSnapping(true);
+    setOffset(0);
+    setAwaitConfirm(false);
   }
 
   return (
@@ -67,12 +84,30 @@ function SwipeRow({ children, onDelete }: SwipeRowProps) {
         className="absolute inset-y-0 right-0 flex items-center justify-center"
         style={{ width: 80, background: 'var(--danger)' }}
       >
-        <svg width="20" height="20" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
-          <polyline points="3 6 5 6 21 6" />
-          <path d="M19 6l-1 14H6L5 6" />
-          <path d="M10 11v6M14 11v6" />
-          <path d="M9 6V4h6v2" />
-        </svg>
+        {awaitConfirm ? (
+          <div className="flex flex-col w-full items-center gap-1 px-2">
+            <button
+              onClick={handleDelete}
+              className="w-full text-xs font-bold text-white py-1 active:opacity-70"
+            >
+              Удалить
+            </button>
+            <button
+              onClick={handleCancel}
+              className="w-full text-[10px] active:opacity-70"
+              style={{ color: 'rgba(255,255,255,0.65)' }}
+            >
+              Отмена
+            </button>
+          </div>
+        ) : (
+          <svg width="20" height="20" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14H6L5 6" />
+            <path d="M10 11v6M14 11v6" />
+            <path d="M9 6V4h6v2" />
+          </svg>
+        )}
       </div>
       {/* Row */}
       <div

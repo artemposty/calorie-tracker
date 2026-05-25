@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { haptic } from '@/lib/haptics';
 
-export type Module = 'nutrition' | 'workout' | 'weight' | 'stats' | 'settings';
+export type Module = 'nutrition' | 'workout' | 'weight' | 'settings';
 
 interface DrawerItem {
   id: Module;
@@ -41,15 +41,6 @@ const ITEMS: DrawerItem[] = [
         <line x1="3" y1="8" x2="21" y2="8" strokeLinecap="round" />
         <path d="M3 8 L5 14 Q6 16 7 14 L9 8" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M15 8 L17 14 Q18 16 19 14 L21 8" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    id: 'stats',
-    label: 'Статистика',
-    icon: (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
