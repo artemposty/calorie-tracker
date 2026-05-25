@@ -150,59 +150,52 @@ export function ExercisesListTab({ exercises, loading, onAdd, onUpdate, onDelete
                           </p>
                         </div>
 
-                        {/* Actions: only custom exercises can be edited/deleted */}
-                        {ex.isCustom ? (
-                          <div className="flex items-center gap-1 shrink-0">
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => { haptic('light'); setEditTarget(ex); }}
+                            className="p-2 rounded-lg active:opacity-60"
+                            style={{ color: 'var(--text-3)' }}
+                            aria-label="Редактировать"
+                          >
+                            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
+                          {confirmDelete === ex.id ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleDelete(ex.id)}
+                                className="text-xs px-2 py-1 rounded-lg font-semibold"
+                                style={{ background: 'var(--danger)', color: '#fff' }}
+                              >
+                                Удалить
+                              </button>
+                              <button
+                                onClick={() => setConfirmDelete(null)}
+                                className="text-xs px-2 py-1 rounded-lg"
+                                style={{ color: 'var(--text-3)', background: 'var(--bg-elevated)' }}
+                              >
+                                Отмена
+                              </button>
+                            </div>
+                          ) : (
                             <button
-                              onClick={() => { haptic('light'); setEditTarget(ex); }}
+                              onClick={() => { haptic('light'); setConfirmDelete(ex.id); }}
                               className="p-2 rounded-lg active:opacity-60"
                               style={{ color: 'var(--text-3)' }}
-                              aria-label="Редактировать"
+                              aria-label="Удалить"
                             >
                               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                <path d="M10 11v6M14 11v6" />
+                                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                               </svg>
                             </button>
-                            {confirmDelete === ex.id ? (
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleDelete(ex.id)}
-                                  className="text-xs px-2 py-1 rounded-lg font-semibold"
-                                  style={{ background: 'var(--danger)', color: '#fff' }}
-                                >
-                                  Удалить
-                                </button>
-                                <button
-                                  onClick={() => setConfirmDelete(null)}
-                                  className="text-xs px-2 py-1 rounded-lg"
-                                  style={{ color: 'var(--text-3)', background: 'var(--bg-elevated)' }}
-                                >
-                                  Отмена
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => { haptic('light'); setConfirmDelete(ex.id); }}
-                                className="p-2 rounded-lg active:opacity-60"
-                                style={{ color: 'var(--text-3)' }}
-                                aria-label="Удалить"
-                              >
-                                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                                  <path d="M10 11v6M14 11v6" />
-                                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                                </svg>
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <svg width="14" height="14" fill="none" stroke="var(--text-4)" strokeWidth="1.5" viewBox="0 0 24 24" className="shrink-0">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                          </svg>
-                        )}
+                          )}
+                        </div>
                       </div>
                       {i < exs.length - 1 && <div style={{ height: 1, background: 'var(--border-sub)', marginLeft: 16 }} />}
                     </div>

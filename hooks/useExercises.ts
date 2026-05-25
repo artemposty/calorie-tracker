@@ -60,8 +60,7 @@ export function useExercises() {
       .from('exercises')
       .delete()
       .eq('id', id)
-      .eq('user_id', USER_ID)
-      .eq('is_system', false);
+      .eq('user_id', USER_ID);
     if (!error) setExercises(prev => prev.filter(e => e.id !== id));
     return !error;
   }, []);
