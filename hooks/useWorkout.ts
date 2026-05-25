@@ -52,7 +52,7 @@ async function fetchSetsForDate(date: string): Promise<WorkoutSetWithExercise[]>
       date: s.date as string,
       weight: Number(s.weight),
       reps: s.reps as number,
-      rpe: s.rpe as number | undefined,
+      rpe: Number(s.rpe ?? 0),
       notes: s.notes as string | undefined,
       createdAt: s.created_at as string,
       exercise: exMap.get(s.exercise_id as string)!,

@@ -81,7 +81,7 @@ export interface WorkoutSet {
   date: string; // YYYY-MM-DD
   weight: number;
   reps: number;
-  rpe?: number;
+  rpe: number;
   notes?: string;
   createdAt: string;
 }

@@ -7,7 +7,7 @@ import { useLastSession } from '@/hooks/useWorkout';
 
 interface Props {
   exercises: Exercise[];
-  onAdd: (params: { exerciseId: string; weight: number; reps: number; rpe?: number }) => Promise<boolean>;
+  onAdd: (params: { exerciseId: string; weight: number; reps: number; rpe: number }) => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -95,7 +95,7 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
       exerciseId: selectedExercise!.id,
       weight: w,
       reps: r,
-      rpe: rpe ? parseInt(rpe) : undefined,
+      rpe: Number(rpe),
     });
     setSaving(false);
 
@@ -261,7 +261,7 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
 
             {/* RPE (optional) */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>RPE (необязательно)</label>
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>RPE</label>
               <div className="flex gap-1.5 flex-wrap">
                 {[6, 7, 7.5, 8, 8.5, 9, 9.5, 10].map(v => (
                   <button
@@ -283,7 +283,7 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
             {/* Add button */}
             <button
               onClick={handleAdd}
-              disabled={saving || !weight || !reps}
+              disabled={saving || !weight || !reps || !rpe}
               className="w-full py-4 rounded-xl font-bold text-base active:opacity-80 transition-opacity disabled:opacity-40"
               style={{ background: 'var(--text-1)', color: 'var(--bg)' }}
             >

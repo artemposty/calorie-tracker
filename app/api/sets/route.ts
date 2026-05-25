@@ -84,8 +84,8 @@ export async function POST(request: Request) {
   }
 
   const b = body as Record<string, unknown>;
-  if (!b.exerciseId || b.weight === undefined || !b.reps) {
-    return Response.json({ error: 'exerciseId, weight, reps are required' }, { status: 400 });
+  if (!b.exerciseId || b.weight === undefined || !b.reps || b.rpe === undefined) {
+    return Response.json({ error: 'exerciseId, weight, reps, rpe are required' }, { status: 400 });
   }
 
   const today = getTodayDate();
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     date,
     weight: Number(b.weight),
     reps: Math.round(Number(b.reps)),
-    rpe: b.rpe !== undefined ? Math.round(Number(b.rpe)) : null,
+    rpe: Number(b.rpe),
     notes: b.notes ? String(b.notes) : null,
   };
 
