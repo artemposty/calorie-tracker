@@ -10,8 +10,9 @@ import { TodayCard } from './TodayCard';
 import { WeeklyVolumeCard } from './WeeklyVolumeCard';
 import { AddSetModal } from './AddSetModal';
 import { ExercisesListTab } from './ExercisesListTab';
+import { WorkoutStatsTab } from './WorkoutStatsTab';
 
-type SubTab = 'today' | 'exercises';
+type SubTab = 'today' | 'exercises' | 'stats';
 
 interface Props {
   onMenuOpen: () => void;
@@ -30,15 +31,16 @@ export function WorkoutTab({ onMenuOpen }: Props) {
       <div className="flex flex-col gap-4">
         <ModuleHeader
           onMenuOpen={onMenuOpen}
-          date={date}
-          onPrev={() => setDate(d => shiftDate(d, -1))}
-          onNext={() => setDate(d => shiftDate(d, 1))}
-          onDateChange={setDate}
+          date={subTab === 'today' ? date : undefined}
+          onPrev={subTab === 'today' ? () => setDate(d => shiftDate(d, -1)) : undefined}
+          onNext={subTab === 'today' ? () => setDate(d => shiftDate(d, 1)) : undefined}
+          onDateChange={subTab === 'today' ? setDate : undefined}
+          title={subTab === 'exercises' ? 'Упражнения' : subTab === 'stats' ? 'Статистика' : undefined}
         />
 
         {/* Sub-tabs */}
         <div className="flex mx-4 gap-2">
-          {([['today', 'Сегодня'], ['exercises', 'Упражнения']] as [SubTab, string][]).map(([id, label]) => (
+          {([['today', 'Сегодня'], ['exercises', 'Упражнения'], ['stats', 'Статистика']] as [SubTab, string][]).map(([id, label]) => (
             <button
               key={id}
               onClick={() => { haptic('light'); setSubTab(id); }}
@@ -73,6 +75,8 @@ export function WorkoutTab({ onMenuOpen }: Props) {
         {subTab === 'exercises' && (
           <ExercisesListTab exercises={exercises} loading={exLoading} />
         )}
+
+        {subTab === 'stats' && <WorkoutStatsTab />}
 
         <div style={{ height: 16 }} />
       </div>
