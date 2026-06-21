@@ -38,15 +38,19 @@ export default function Home() {
       });
   }, []);
 
-  function saveGoals(g: Goals) {
+  async function saveGoals(g: Goals): Promise<string | null> {
     setGoals(g);
-    const base = { user_id: USER_ID, kcal: g.kcal, protein: g.protein, fat: g.fat, carbs: g.carbs, updated_at: new Date().toISOString() };
-    supabase.from('user_goals').upsert({ ...base, base_tdee: g.base_tdee ?? 2400 }).then(({ error }) => {
-      if (error) {
-        // base_tdee column doesn't exist yet — save without it (run the migration to fix)
-        supabase.from('user_goals').upsert(base);
-      }
-    });
+    const { error } = await supabase.from('user_goals').upsert({
+      user_id: USER_ID,
+      kcal: g.kcal,
+      protein: g.protein,
+      fat: g.fat,
+      carbs: g.carbs,
+      base_tdee: g.base_tdee ?? 2400,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' });
+    if (error) console.error('[saveGoals]', error.message);
+    return error?.message ?? null;
   }
 
   function handleImport(data: AppExport) {

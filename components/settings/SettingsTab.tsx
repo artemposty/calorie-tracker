@@ -9,7 +9,7 @@ import { WeightEntry, FoodEntry } from '@/lib/types';
 
 interface Props {
   goals: Goals;
-  onSave: (goals: Goals) => void;
+  onSave: (goals: Goals) => Promise<string | null>;
   nutrition: Record<string, FoodEntry[]>;
   weight: WeightEntry[];
   onImport: (data: AppExport) => void;
@@ -46,14 +46,22 @@ export function SettingsTab({ goals, onSave, nutrition, weight, onImport, onMenu
   const [fat,      setFat]      = useState(String(goals.fat));
   const [carbs,    setCarbs]    = useState(String(goals.carbs));
   const [baseTdee, setBaseTdee] = useState(String(goals.base_tdee ?? 2400));
-  const [saved,   setSaved]   = useState(false);
+  const [saved,     setSaved]     = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
 
-  function handleSave() {
-    haptic('success');
-    onSave({ kcal: num(kcal), protein: num(protein), fat: num(fat), carbs: num(carbs), base_tdee: num(baseTdee) });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  async function handleSave() {
+    haptic('medium');
+    setSaveError(null);
+    const err = await onSave({ kcal: num(kcal), protein: num(protein), fat: num(fat), carbs: num(carbs), base_tdee: num(baseTdee) });
+    if (err) {
+      setSaveError(err);
+      haptic('error' as Parameters<typeof haptic>[0]);
+    } else {
+      haptic('success');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
   }
 
   const fields = [
@@ -100,6 +108,12 @@ export function SettingsTab({ goals, onSave, nutrition, weight, onImport, onMenu
           Расход в день без тренировки. По умолчанию 2400 — скорректируй под свой реальный TDEE.
         </p>
       </div>
+
+      {saveError && (
+        <div className="rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(255,69,58,0.12)', color: 'var(--danger)', border: '1px solid rgba(255,69,58,0.3)' }}>
+          Ошибка: {saveError}
+        </div>
+      )}
 
       <button
         onClick={handleSave}
