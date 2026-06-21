@@ -6,6 +6,7 @@ export const DEFAULT_GOALS: Goals = {
   protein: 175,
   fat: 65,
   carbs: 235,
+  base_tdee: 2400,
 };
 
 export const STARTING_WEIGHT = 87; // kg, for chart reference line

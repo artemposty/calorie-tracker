@@ -20,6 +20,7 @@ export interface Goals {
   protein: number;
   fat: number;
   carbs: number;
+  base_tdee?: number; // user-configured resting daily expenditure (no workout); defaults to 2400
 }
 
 export interface FoodItem {

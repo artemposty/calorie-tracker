@@ -33,14 +33,19 @@ export default function Home() {
       .eq('user_id', USER_ID)
       .single()
       .then(({ data }) => {
-        if (data) setGoals({ kcal: data.kcal, protein: data.protein, fat: data.fat, carbs: data.carbs });
+        if (data) setGoals({ kcal: data.kcal, protein: data.protein, fat: data.fat, carbs: data.carbs, base_tdee: (data as Record<string, unknown>).base_tdee as number ?? 2400 });
         setGoalsLoaded(true);
       });
   }, []);
 
   function saveGoals(g: Goals) {
     setGoals(g);
-    supabase.from('user_goals').upsert({ user_id: USER_ID, ...g, updated_at: new Date().toISOString() });
+    supabase.from('user_goals').upsert({
+      user_id: USER_ID,
+      kcal: g.kcal, protein: g.protein, fat: g.fat, carbs: g.carbs,
+      base_tdee: g.base_tdee ?? 2400,
+      updated_at: new Date().toISOString(),
+    });
   }
 
   function handleImport(data: AppExport) {

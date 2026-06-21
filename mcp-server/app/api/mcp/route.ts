@@ -18,6 +18,11 @@ function getTodayDate(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function withTs(data: unknown): string {
+  const obj = typeof data === 'object' && data !== null ? data : { result: data };
+  return JSON.stringify({ ...obj as Record<string, unknown>, _timestamp: new Date().toISOString() }, null, 2);
+}
+
 async function trackerFetch(path: string, options?: RequestInit) {
   const url = `${getTrackerUrl()}${path}`;
   const res = await fetch(url, {
@@ -68,13 +73,8 @@ function buildServer(): McpServer {
     },
     async ({ meals }) => {
       try {
-        const result = await trackerFetch('/api/entries', {
-          method: 'POST',
-          body: JSON.stringify(meals),
-        });
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result) }],
-        };
+        const result = await trackerFetch('/api/entries', { method: 'POST', body: JSON.stringify(meals) });
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -101,7 +101,7 @@ function buildServer(): McpServer {
           method: 'POST',
           body: JSON.stringify({ weight, date }),
         });
-        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -118,13 +118,14 @@ function buildServer(): McpServer {
     async () => {
       try {
         const today = getTodayDate();
-        const [stats, entries] = await Promise.all([
+        const [stats, entries, energy] = await Promise.all([
           trackerFetch(`/api/stats?days=1`),
           trackerFetch(`/api/entries?from=${today}&to=${today}`),
+          trackerFetch(`/api/energy?days=1`),
         ]);
 
-        const day = (stats.days as { date: string; kcal: number; p: number; f: number; c: number; weight: number | null }[]).find((d) => d.date === today) ?? {
-          kcal: 0, p: 0, f: 0, c: 0, weight: null,
+        const day = (stats.days as { date: string; kcal: number; p: number; f: number; c: number; weight: number | null; had_workout: boolean; workout_kcal: number; day_expenditure: number; deficit: number | null }[]).find((d) => d.date === today) ?? {
+          kcal: 0, p: 0, f: 0, c: 0, weight: null, had_workout: false, workout_kcal: 0, day_expenditure: 0, deficit: null,
         };
         const goals = stats.goals as { kcal: number; p: number; f: number; c: number };
 
@@ -143,18 +144,20 @@ function buildServer(): McpServer {
             p: goals.p ? Math.round((day.p / goals.p) * 100) : 0,
           },
           weight_today: day.weight,
+          energy: {
+            base_tdee: (stats as Record<string, unknown>).base_tdee,
+            had_workout: day.had_workout,
+            workout_kcal: day.workout_kcal,
+            day_expenditure: day.day_expenditure,
+            deficit: day.deficit,
+          },
           meals: (entries.entries as { id: string; name: string; grams: number; kcal: number; p: number; f: number; c: number }[]).map((e) => ({
-            id: e.id,
-            name: e.name,
-            grams: e.grams,
-            kcal: e.kcal,
-            p: e.p,
-            f: e.f,
-            c: e.c,
+            id: e.id, name: e.name, grams: e.grams, kcal: e.kcal, p: e.p, f: e.f, c: e.c,
           })),
+          _energy_ref: (energy as Record<string, unknown>).averages,
         };
 
-        return { content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }] };
+        return { content: [{ type: 'text', text: withTs(summary) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -179,7 +182,7 @@ function buildServer(): McpServer {
     async ({ days }) => {
       try {
         const result = await trackerFetch(`/api/stats?days=${days}`);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -210,7 +213,7 @@ function buildServer(): McpServer {
         if (from) params.set('from', from);
         if (to) params.set('to', to);
         const result = await trackerFetch(`/api/entries?${params}`);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -231,7 +234,7 @@ function buildServer(): McpServer {
         const result = await trackerFetch(`/api/entries/${encodeURIComponent(id)}`, {
           method: 'DELETE',
         });
-        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -259,7 +262,7 @@ function buildServer(): McpServer {
           method: 'POST',
           body: JSON.stringify({ name, p, f, c, kcal: computedKcal, default_grams }),
         });
-        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -293,7 +296,7 @@ function buildServer(): McpServer {
           method: 'POST',
           body: JSON.stringify({ exerciseId: exercise_id, weight, reps, rpe, date, notes }),
         });
-        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -310,7 +313,7 @@ function buildServer(): McpServer {
     async () => {
       try {
         const result = await trackerFetch('/api/training/dashboard');
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -329,7 +332,7 @@ function buildServer(): McpServer {
     async ({ exercise_id }) => {
       try {
         const result = await trackerFetch(`/api/training/last-session?exercise_id=${encodeURIComponent(exercise_id)}`);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -358,7 +361,7 @@ function buildServer(): McpServer {
         const result = await trackerFetch(
           `/api/training/exercise-progress?exercise_id=${encodeURIComponent(exercise_id)}&days=${days}`,
         );
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -384,7 +387,7 @@ function buildServer(): McpServer {
     async ({ weeks }) => {
       try {
         const result = await trackerFetch(`/api/training/weekly-volume?weeks=${weeks}`);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -400,7 +403,7 @@ function buildServer(): McpServer {
     async () => {
       try {
         const result = await trackerFetch('/api/exercises');
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }
@@ -440,7 +443,52 @@ function buildServer(): McpServer {
             notes,
           }),
         });
-        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+        return { content: [{ type: 'text', text: withTs(result) }] };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: String(e) }] };
+      }
+    },
+  );
+
+  // ── get_energy_balance ───────────────────────────────────────────────────
+  server.registerTool(
+    'get_energy_balance',
+    {
+      description:
+        'Get daily energy balance (eaten vs expenditure, deficit/surplus) with workout contribution. ' +
+        'Includes reverse-TDEE calibration when ≥14 days of data with weight entries are available.',
+      inputSchema: {
+        days: z.number().int().min(1).max(365).default(30).describe('Days to look back (default: 30)'),
+      },
+    },
+    async ({ days }) => {
+      try {
+        const result = await trackerFetch(`/api/energy?days=${days}`);
+        return { content: [{ type: 'text', text: withTs(result) }] };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: String(e) }] };
+      }
+    },
+  );
+
+  // ── set_base_tdee ────────────────────────────────────────────────────────
+  server.registerTool(
+    'set_base_tdee',
+    {
+      description:
+        'Update the user\'s base TDEE (daily energy expenditure without workout). ' +
+        'Use get_energy_balance calibration.real_tdee as a reference when adjusting.',
+      inputSchema: {
+        base_tdee: z.number().int().min(1000).max(6000).describe('New base TDEE in kcal/day'),
+      },
+    },
+    async ({ base_tdee }) => {
+      try {
+        const result = await trackerFetch('/api/tdee', {
+          method: 'POST',
+          body: JSON.stringify({ base_tdee }),
+        });
+        return { content: [{ type: 'text', text: withTs(result) }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: String(e) }] };
       }

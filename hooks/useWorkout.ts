@@ -168,6 +168,46 @@ export function useWeeklyVolume() {
   return { volume, loading };
 }
 
+/** Lightweight hook: fetches total tonnage (kg) for a single day. */
+export function useTodayTonnage(date: string): number {
+  const [tonnage, setTonnage] = useState(0);
+  useEffect(() => {
+    supabase
+      .from('workout_sets')
+      .select('weight, reps')
+      .eq('user_id', USER_ID)
+      .eq('date', date)
+      .then(({ data }) => {
+        setTonnage(Math.round((data ?? []).reduce((s, r) => s + Number(r.weight) * (r.reps as number), 0)));
+      });
+  }, [date]);
+  return tonnage;
+}
+
+/** Fetches tonnage per date for a date range (for stats). */
+export function useWorkoutTonnageByDate(from: string, to: string): Record<string, number> {
+  const [byDate, setByDate] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!from || !to) return;
+    (async () => {
+      const { data } = await supabase
+        .from('workout_sets')
+        .select('date, weight, reps')
+        .eq('user_id', USER_ID)
+        .gte('date', from)
+        .lte('date', to);
+      const map: Record<string, number> = {};
+      for (const r of data ?? []) {
+        const d = r.date as string;
+        map[d] = (map[d] ?? 0) + Number(r.weight) * (r.reps as number);
+      }
+      for (const d of Object.keys(map)) map[d] = Math.round(map[d]);
+      setByDate(map);
+    })();
+  }, [from, to]);
+  return byDate;
+}
+
 export function useLastSession(exerciseId: string | null) {
   const [session, setSession] = useState<{ date: string; sets: { weight: number; reps: number; rpe?: number }[] } | null>(null);
 

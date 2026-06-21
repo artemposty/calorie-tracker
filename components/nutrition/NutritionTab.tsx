@@ -9,7 +9,9 @@ import { CalorieDisplay } from './CalorieDisplay';
 import { MacroProgress } from './MacroProgress';
 import { MealList } from './MealList';
 import { AddMealModal } from './AddMealModal';
+import { EnergyBalance } from './EnergyBalance';
 import { StatsTab } from '@/components/stats/StatsTab';
+import { useTodayTonnage } from '@/hooks/useWorkout';
 
 type SubTab = 'tracker' | 'stats';
 
@@ -28,8 +30,10 @@ export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, ad
   const [date, setDate] = useState(getTodayDate);
   const [showAdd, setShowAdd] = useState(false);
 
-  const entries = getDayEntries(date);
-  const totals = calcTotals(entries);
+  const entries  = getDayEntries(date);
+  const totals   = calcTotals(entries);
+  const tonnage  = useTodayTonnage(date);
+  const baseTdee = goals.base_tdee ?? 2400;
 
   return (
     <>
@@ -46,6 +50,7 @@ export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, ad
         {subTab === 'tracker' && (
           <>
             <CalorieDisplay totals={totals} goals={goals} />
+            <EnergyBalance baseTdee={baseTdee} tonnage={tonnage} eaten={totals.kcal} />
             <MacroProgress totals={totals} goals={goals} />
             <MealList entries={entries} onDelete={id => deleteEntry(date, id)} />
           </>

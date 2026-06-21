@@ -41,16 +41,17 @@ function FieldRow({ label, unit, color, value, onChange }: {
 }
 
 export function SettingsTab({ goals, onSave, nutrition, weight, onImport, onMenuOpen }: Props) {
-  const [kcal,    setKcal]    = useState(String(goals.kcal));
-  const [protein, setProtein] = useState(String(goals.protein));
-  const [fat,     setFat]     = useState(String(goals.fat));
-  const [carbs,   setCarbs]   = useState(String(goals.carbs));
+  const [kcal,     setKcal]     = useState(String(goals.kcal));
+  const [protein,  setProtein]  = useState(String(goals.protein));
+  const [fat,      setFat]      = useState(String(goals.fat));
+  const [carbs,    setCarbs]    = useState(String(goals.carbs));
+  const [baseTdee, setBaseTdee] = useState(String(goals.base_tdee ?? 2400));
   const [saved,   setSaved]   = useState(false);
   const [showExport, setShowExport] = useState(false);
 
   function handleSave() {
     haptic('success');
-    onSave({ kcal: num(kcal), protein: num(protein), fat: num(fat), carbs: num(carbs) });
+    onSave({ kcal: num(kcal), protein: num(protein), fat: num(fat), carbs: num(carbs), base_tdee: num(baseTdee) });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -79,6 +80,25 @@ export function SettingsTab({ goals, onSave, nutrition, weight, onImport, onMenu
             </div>
           ))}
         </div>
+      </div>
+
+      {/* TDEE */}
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-4)' }}>
+          Расход без тренировки (Base TDEE)
+        </p>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
+          <FieldRow
+            label="Base TDEE"
+            unit="ккал/день · калибруй по факту"
+            color="rgba(255,255,255,0.3)"
+            value={baseTdee}
+            onChange={setBaseTdee}
+          />
+        </div>
+        <p className="text-xs mt-1.5 px-1" style={{ color: 'var(--text-4)' }}>
+          Расход в день без тренировки. По умолчанию 2400 — скорректируй под свой реальный TDEE.
+        </p>
       </div>
 
       <button
