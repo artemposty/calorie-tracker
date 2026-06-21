@@ -13,7 +13,6 @@ import { NutritionTab } from '@/components/nutrition/NutritionTab';
 import { WeightTab } from '@/components/weight/WeightTab';
 import { SettingsTab } from '@/components/settings/SettingsTab';
 import { WorkoutTab } from '@/components/workout/WorkoutTab';
-import { PullToRefresh } from '@/components/shared/PullToRefresh';
 
 export default function Home() {
   const [module,      setModule]      = useState<Module>('nutrition');
@@ -59,8 +58,7 @@ export default function Home() {
       <SwipeEdgeDetector onOpen={openDrawer} />
       <Drawer open={drawerOpen} active={module} onSelect={setModule} onClose={closeDrawer} />
 
-      <PullToRefresh>
-        <div style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 20px)' }}>
+      <div style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 20px)' }}>
           {module === 'nutrition' && (
             <NutritionTab
               goals={goals}
@@ -94,7 +92,6 @@ export default function Home() {
             />
           )}
         </div>
-      </PullToRefresh>
     </div>
   );
 }

@@ -286,33 +286,6 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
                 </div>
               ) : pickerView === 'groups' ? (
                 <>
-                  {/* Recent */}
-                  {recentExercises.length > 0 && (
-                    <div className="px-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-4)' }}>
-                        Недавние
-                      </p>
-                      <div style={{ borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
-                        {recentExercises.slice(0, 5).map((ex, i) => (
-                          <div key={ex.id}>
-                            <button
-                              className="w-full flex items-center justify-between px-4 py-3 text-left active:opacity-60"
-                              style={{ background: 'var(--bg-card)' }}
-                              onClick={() => handleSelectExercise(ex)}
-                            >
-                              <div>
-                                <p className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>{ex.name}</p>
-                                <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{MUSCLE_LABELS[ex.primaryMuscle]}</p>
-                              </div>
-                              <svg width="16" height="16" fill="none" stroke="var(--text-4)" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
-                            </button>
-                            {i < Math.min(recentExercises.length, 5) - 1 && <div style={{ height: 1, background: 'var(--border-sub)', marginLeft: 16 }} />}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Muscle group grid */}
                   <div className="px-4">
                     <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-4)' }}>
@@ -426,46 +399,31 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
 
               {/* Previous sessions */}
               {histLoading ? (
-                <div className="skeleton h-20 rounded-xl" />
+                <div className="skeleton h-16 rounded-xl" />
               ) : prevSessions.length > 0 && (
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-4)' }}>
-                    История · {prevSessions.length} {prevSessions.length === 1 ? 'тренировка' : prevSessions.length < 5 ? 'тренировки' : 'тренировок'}
+                <div className="flex flex-col gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-4)' }}>
+                    История
                   </p>
-                  <div className="flex flex-col gap-2">
-                    {prevSessions.map(session => (
-                      <div key={session.date} style={{ borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
-                        <div
-                          className="px-4 py-2"
-                          style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-sub)' }}
-                        >
-                          <p className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>{fmtDate(session.date)}</p>
-                        </div>
+                  {prevSessions.map(session => (
+                    <div key={session.date}>
+                      <p className="text-xs mb-1.5" style={{ color: 'var(--text-3)' }}>
+                        {fmtDate(session.date)} · <span style={{ color: 'var(--text-4)' }}>{session.sets.length} подх.</span>
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
                         {session.sets.map((s, i) => (
-                          <div key={i}>
-                            <button
-                              className="w-full flex items-center justify-between px-4 py-2.5 active:opacity-60 text-left"
-                              style={{ background: 'var(--bg-card)' }}
-                              onClick={() => {
-                                haptic('light');
-                                setWeight(String(s.weight));
-                                setReps(String(s.reps));
-                                if (s.rpe) setRpe(String(s.rpe));
-                              }}
-                            >
-                              <span className="text-sm font-medium tabular-nums" style={{ color: 'var(--text-1)' }}>
-                                {s.weight} кг × {s.reps}
-                              </span>
-                              <span className="text-xs tabular-nums" style={{ color: 'var(--text-3)' }}>
-                                RPE {s.rpe || '—'}
-                              </span>
-                            </button>
-                            {i < session.sets.length - 1 && <div style={{ height: 1, background: 'var(--border-sub)', marginLeft: 16 }} />}
-                          </div>
+                          <button
+                            key={i}
+                            className="text-xs px-2.5 py-1 rounded-lg active:opacity-60 tabular-nums"
+                            style={{ background: 'var(--bg-elevated)', color: 'var(--text-2)', border: '1px solid var(--border)' }}
+                            onClick={() => { haptic('light'); setWeight(String(s.weight)); setReps(String(s.reps)); if (s.rpe) setRpe(String(s.rpe)); }}
+                          >
+                            {s.weight}×{s.reps}
+                          </button>
                         ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
