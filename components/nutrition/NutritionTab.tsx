@@ -9,9 +9,9 @@ import { CalorieDisplay } from './CalorieDisplay';
 import { MacroProgress } from './MacroProgress';
 import { MealList } from './MealList';
 import { AddMealModal } from './AddMealModal';
-import { EnergyBalance } from './EnergyBalance';
 import { StatsTab } from '@/components/stats/StatsTab';
 import { useTodayTonnage } from '@/hooks/useWorkout';
+import { calcWorkoutKcal, calcExpenditure } from '@/lib/energy';
 
 type SubTab = 'tracker' | 'stats';
 
@@ -30,14 +30,17 @@ export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, ad
   const [date, setDate] = useState(getTodayDate);
   const [showAdd, setShowAdd] = useState(false);
 
-  const entries  = getDayEntries(date);
-  const totals   = calcTotals(entries);
-  const tonnage  = useTodayTonnage(date);
-  const baseTdee = goals.base_tdee ?? 2400;
+  const entries     = getDayEntries(date);
+  const totals      = calcTotals(entries);
+  const tonnage     = useTodayTonnage(date);
+  const baseTdee    = goals.base_tdee ?? 2400;
+  const workoutKcal = calcWorkoutKcal(tonnage);
+  const expenditure = calcExpenditure(baseTdee, workoutKcal);
 
   return (
     <>
-      <div className="flex flex-col gap-4" style={{ paddingBottom: 'calc(56px + max(env(safe-area-inset-bottom), 8px))' }}>
+      {/* paddingBottom = tab-bar + FAB + gap so last meal is never hidden */}
+      <div className="flex flex-col gap-4" style={{ paddingBottom: 'calc(140px + max(env(safe-area-inset-bottom), 8px))' }}>
         <ModuleHeader
           onMenuOpen={onMenuOpen}
           date={subTab === 'tracker' ? date : undefined}
@@ -49,8 +52,12 @@ export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, ad
 
         {subTab === 'tracker' && (
           <>
-            <CalorieDisplay totals={totals} goals={goals} />
-            <EnergyBalance baseTdee={baseTdee} tonnage={tonnage} eaten={totals.kcal} />
+            <CalorieDisplay
+              totals={totals}
+              goals={goals}
+              expenditure={expenditure}
+              workoutKcal={workoutKcal}
+            />
             <MacroProgress totals={totals} goals={goals} />
             <MealList entries={entries} onDelete={id => deleteEntry(date, id)} />
           </>

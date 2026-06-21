@@ -133,7 +133,7 @@ export function StatsTab({ nutritionData, goals }: Props) {
                 className="text-xl font-light tabular-nums"
                 style={{ color: avgDeficit >= 0 ? 'var(--success)' : 'var(--danger)' }}
               >
-                {avgDeficit >= 0 ? '+' : ''}{avgDeficit}
+                {avgDeficit >= 0 ? '−' : '+'}{Math.abs(avgDeficit)}
               </p>
               <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-3)' }}>
                 {avgDeficit >= 0 ? 'ср. дефицит' : 'ср. профицит'}
@@ -142,10 +142,12 @@ export function StatsTab({ nutritionData, goals }: Props) {
             <div>
               {estFatLoss !== null && estFatLoss !== 0 && (
                 <>
-                  <p className="text-xl font-light tabular-nums" style={{ color: estFatLoss > 0 ? 'var(--success)' : 'var(--danger)' }}>
-                    {estFatLoss > 0 ? '-' : '+'}{Math.abs(estFatLoss)}
+                  <p className="text-xl font-light tabular-nums"
+                    style={{ color: estFatLoss > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {estFatLoss > 0 ? '−' : '+'}{Math.abs(estFatLoss)}
                   </p>
-                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-3)' }}>кг за период</p>
+                  {/* "кг жира" — estimate based on TDEE, not actual weigh-ins */}
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-3)' }}>≈ кг жира</p>
                 </>
               )}
             </div>
