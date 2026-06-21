@@ -40,11 +40,12 @@ export default function Home() {
 
   function saveGoals(g: Goals) {
     setGoals(g);
-    supabase.from('user_goals').upsert({
-      user_id: USER_ID,
-      kcal: g.kcal, protein: g.protein, fat: g.fat, carbs: g.carbs,
-      base_tdee: g.base_tdee ?? 2400,
-      updated_at: new Date().toISOString(),
+    const base = { user_id: USER_ID, kcal: g.kcal, protein: g.protein, fat: g.fat, carbs: g.carbs, updated_at: new Date().toISOString() };
+    supabase.from('user_goals').upsert({ ...base, base_tdee: g.base_tdee ?? 2400 }).then(({ error }) => {
+      if (error) {
+        // base_tdee column doesn't exist yet — save without it (run the migration to fix)
+        supabase.from('user_goals').upsert(base);
+      }
     });
   }
 
