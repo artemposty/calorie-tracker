@@ -127,19 +127,11 @@ export function CalorieDisplay({ totals, goals, expenditure, workoutKcal }: Prop
           )}
         </div>
 
-        {/* ── Layer 0: SVG track + overflow ─────────────────────────────── */}
+        {/* ── Layer 0: SVG track ────────────────────────────────────────── */}
         <svg width="240" height="240" viewBox="0 0 240 240"
           style={{ ...fade, position: 'absolute', inset: 0, overflow: 'visible', zIndex: 0 }}>
           <g transform="rotate(-90 120 120)">
             <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={SW} />
-            {overflowFrac > 0 && (
-              <circle cx={CX} cy={CY} r={R} fill="none"
-                stroke="#ff453a" strokeWidth={SW + 2} strokeLinecap="round"
-                strokeDasharray={`${overflowFrac * CIRC} ${CIRC}`}
-                strokeDashoffset={0}
-                style={{ filter: 'drop-shadow(0 0 14px rgba(255,69,58,0.82))' }}
-              />
-            )}
           </g>
         </svg>
 
@@ -150,9 +142,20 @@ export function CalorieDisplay({ totals, goals, expenditure, workoutKcal }: Prop
           WebkitMask: RING_MASK, mask: RING_MASK, zIndex: 1,
         }} />
 
-        {/* ── Layer 2: SVG caps + tick + label ──────────────────────────── */}
+        {/* ── Layer 2: SVG overflow + caps + tick + label ─────────────────── */}
         <svg width="240" height="240" viewBox="0 0 240 240"
           style={{ ...fade, position: 'absolute', inset: 0, overflow: 'visible', zIndex: 2 }}>
+          {/* Overflow arc — ON TOP of gradient ring */}
+          {overflowFrac > 0 && (
+            <g transform="rotate(-90 120 120)">
+              <circle cx={CX} cy={CY} r={R} fill="none"
+                stroke="#ff453a" strokeWidth={SW + 2} strokeLinecap="round"
+                strokeDasharray={`${overflowFrac * CIRC} ${CIRC}`}
+                strokeDashoffset={0}
+                style={{ filter: 'drop-shadow(0 0 14px rgba(255,69,58,0.82))' }}
+              />
+            </g>
+          )}
           {eatenFrac > 0.01 && (
             <>
               <circle cx={CX} cy={CY - R} r={SW / 2} fill="rgba(222,226,255,0.84)" />
