@@ -2,20 +2,35 @@
 
 import { useEffect, useState } from 'react';
 import { Goals, DayTotals } from '@/lib/types';
+import { useTweenedValue } from '@/hooks/useTweenedValue';
 
 interface Props {
   totals: DayTotals;
   goals: Goals;
-  expenditure: number;   // base_tdee + workout_kcal
-  workoutKcal: number;   // addon from today's session (0 if no workout)
+  expenditure: number;
+  workoutKcal: number;
 }
 
 const CX = 120, CY = 120, R = 108, SW = 13;
 const CIRC = 2 * Math.PI * R;
+const LABEL = 'rgba(255,255,255,0.28)';
 
 function toXY(angleDeg: number, r: number) {
   const rad = (angleDeg - 90) * Math.PI / 180;
   return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) };
+}
+
+function DumbbellIcon() {
+  return (
+    <svg width="14" height="8" viewBox="0 0 14 8" fill="none"
+      stroke={LABEL} strokeWidth="1.5" strokeLinecap="round">
+      <line x1="4"    y1="4"   x2="10"   y2="4"   />
+      <line x1="3"    y1="1.5" x2="3"    y2="6.5" />
+      <line x1="11"   y1="1.5" x2="11"   y2="6.5" />
+      <line x1="1.5"  y1="2.5" x2="1.5"  y2="5.5" />
+      <line x1="12.5" y1="2.5" x2="12.5" y2="5.5" />
+    </svg>
+  );
 }
 
 export function CalorieDisplay({ totals, goals, expenditure, workoutKcal }: Props) {
@@ -26,132 +41,150 @@ export function CalorieDisplay({ totals, goals, expenditure, workoutKcal }: Prop
   const goalKcal = goals.kcal;
   const exp      = expenditure > 0 ? expenditure : goalKcal;
 
-  // Arc progress values (0..1, overflow capped at 1 for the overflow arc)
-  const mainProgress     = mounted ? Math.min(eaten / exp, 1) : 0;
-  const overflowProgress = mounted ? Math.max(0, Math.min((eaten - exp) / exp, 1)) : 0;
-  const goalProgress     = Math.min(goalKcal / exp, 1);
+  // All arc fractions are derived from tweenedEaten → animate on every value change
+  const tweenedEaten = useTweenedValue(eaten);
+  const goalFrac     = Math.min(goalKcal / exp, 1);
+  const eatenFrac    = Math.min(tweenedEaten / exp, 1);
+  const neutralFrac  = Math.min(eatenFrac, goalFrac);
+  const warningFrac  = Math.max(0, eatenFrac - goalFrac);
+  const overflowFrac = Math.max(0, Math.min((tweenedEaten - exp) / exp, 1));
 
-  const goalAngle = goalProgress * 360;
-  const deficit   = exp - eaten;          // >0 = deficit (good), <0 = surplus
-  const isDeficit = deficit >= 0;
-  const hasOverflow = overflowProgress > 0;
+  // Chip: actual sign determines label, tweened value determines number
+  const isDeficit     = exp - eaten >= 0;
+  const tweenedDef    = exp - tweenedEaten;
 
-  // Goal tick + label positions in SVG coordinate space
+  // Goal tick geometry
+  const goalAngle    = goalFrac * 360;
   const goalInner    = toXY(goalAngle, R - 8);
   const goalOuter    = toXY(goalAngle, R + 10);
   const goalLabelPos = toXY(goalAngle, R + 24);
-  const anchor = goalLabelPos.x < CX - 10 ? 'end' : goalLabelPos.x > CX + 10 ? 'start' : 'middle';
+  const goalAnchor   = goalLabelPos.x < CX - 10 ? 'end'
+                     : goalLabelPos.x > CX + 10 ? 'start'
+                     : 'middle';
 
-  const transition = mounted
-    ? 'stroke-dashoffset 1.1s cubic-bezier(0.25,0.46,0.45,0.94)'
-    : 'none';
+  const fade: React.CSSProperties = { opacity: mounted ? 1 : 0, transition: 'opacity 0.45s ease' };
 
   return (
     <div className="flex justify-center">
-      {/* Wrapper: extra top margin for the expenditure label */}
-      <div style={{ position: 'relative', width: 240, height: 240, marginTop: 32 }}>
+      <div style={{ position: 'relative', width: 240, height: 240, marginTop: 40 }}>
 
         {/* ── Expenditure label — above 12 o'clock ─────────────────────── */}
         <div style={{
-          position: 'absolute', top: -28, left: 0, right: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          ...fade,
+          position: 'absolute', top: -38, left: 0, right: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
           pointerEvents: 'none',
         }}>
-          <p style={{ fontSize: 11, color: 'var(--text-3)', letterSpacing: '0.02em' }}>
-            расход {exp.toLocaleString('ru')} ккал
+          <p style={{ fontSize: 10, color: LABEL, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.02em' }}>
+            расход {exp.toLocaleString('ru')}
           </p>
           {workoutKcal > 0 && (
-            <p style={{ fontSize: 10, color: 'var(--text-4)' }}>🏋 +{workoutKcal}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <DumbbellIcon />
+              <p style={{ fontSize: 10, color: LABEL, fontVariantNumeric: 'tabular-nums' }}>
+                +{workoutKcal}
+              </p>
+            </div>
           )}
         </div>
 
-        {/* ── SVG ──────────────────────────────────────────────────────── */}
+        {/* ── SVG ring ─────────────────────────────────────────────────── */}
         <svg width="240" height="240" viewBox="0 0 240 240"
-          style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
+          style={{ ...fade, position: 'absolute', inset: 0, overflow: 'visible' }}>
 
-          {/* Arcs — rotated so dashoffset starts from 12 o'clock */}
+          {/* Arcs — rotated so 0° = 12 o'clock */}
           <g transform="rotate(-90 120 120)">
             {/* Track */}
             <circle cx={CX} cy={CY} r={R} fill="none"
               stroke="rgba(255,255,255,0.07)" strokeWidth={SW} />
 
-            {/* Main eaten arc — neutral silver-white */}
-            <circle cx={CX} cy={CY} r={R} fill="none"
-              stroke="rgba(235,235,255,0.83)" strokeWidth={SW}
-              strokeLinecap="round"
-              strokeDasharray={CIRC}
-              strokeDashoffset={CIRC * (1 - mainProgress)}
-              style={{
-                transition,
-                filter: 'drop-shadow(0 0 5px rgba(190,190,255,0.32))',
-              }}
-            />
-
-            {/* Overflow arc — alarm red, slightly thicker, glowing */}
-            {hasOverflow && (
+            {/* Neutral cool-white (0 → goal zone) */}
+            {neutralFrac > 0 && (
               <circle cx={CX} cy={CY} r={R} fill="none"
-                stroke="#ff453a" strokeWidth={SW + 3}
-                strokeLinecap="round"
-                strokeDasharray={CIRC}
-                strokeDashoffset={CIRC * (1 - overflowProgress)}
-                style={{
-                  transition,
-                  filter: 'drop-shadow(0 0 14px rgba(255,69,58,0.82))',
-                }}
+                stroke="rgba(222,226,255,0.84)"
+                strokeWidth={SW} strokeLinecap="round"
+                strokeDasharray={`${neutralFrac * CIRC} ${CIRC}`}
+                strokeDashoffset={0}
+                style={{ filter: 'drop-shadow(0 0 4px rgba(195,200,255,0.25))' }}
+              />
+            )}
+
+            {/* Amber warning (goal zone → expenditure) */}
+            {warningFrac > 0 && (
+              <circle cx={CX} cy={CY} r={R} fill="none"
+                stroke="rgba(255,152,8,0.88)"
+                strokeWidth={SW} strokeLinecap="round"
+                strokeDasharray={`${warningFrac * CIRC} ${CIRC}`}
+                strokeDashoffset={-(goalFrac * CIRC)}
+                style={{ filter: 'drop-shadow(0 0 7px rgba(255,140,0,0.42))' }}
+              />
+            )}
+
+            {/* Alarm red overflow (beyond expenditure, restarts from 0°) */}
+            {overflowFrac > 0 && (
+              <circle cx={CX} cy={CY} r={R} fill="none"
+                stroke="#ff453a"
+                strokeWidth={SW + 2} strokeLinecap="round"
+                strokeDasharray={`${overflowFrac * CIRC} ${CIRC}`}
+                strokeDashoffset={0}
+                style={{ filter: 'drop-shadow(0 0 14px rgba(255,69,58,0.82))' }}
               />
             )}
           </g>
 
-          {/* Goal tick — in screen coords (no rotation) */}
-          <line
-            x1={goalInner.x} y1={goalInner.y}
-            x2={goalOuter.x} y2={goalOuter.y}
-            stroke="rgba(255,255,255,0.42)" strokeWidth="2.5" strokeLinecap="round"
-          />
+          {/* Goal tick */}
+          <line x1={goalInner.x} y1={goalInner.y} x2={goalOuter.x} y2={goalOuter.y}
+            stroke="rgba(255,255,255,0.38)" strokeWidth="2.5" strokeLinecap="round" />
 
           {/* Goal label */}
-          <text
-            x={goalLabelPos.x} y={goalLabelPos.y}
-            textAnchor={anchor} dominantBaseline="middle"
-            fontSize="10" fontFamily="system-ui,-apple-system,sans-serif"
-            fill="rgba(255,255,255,0.28)"
-          >
+          <text x={goalLabelPos.x} y={goalLabelPos.y}
+            textAnchor={goalAnchor} dominantBaseline="middle"
+            fontSize="10" fontFamily="system-ui,-apple-system,sans-serif" fill={LABEL}>
             цель {goalKcal.toLocaleString('ru')}
           </text>
         </svg>
 
-        {/* ── Center text ───────────────────────────────────────────────── */}
+        {/* ── Center ───────────────────────────────────────────────────── */}
         <div className="absolute inset-0 flex flex-col items-center justify-center select-none"
-          style={{ gap: 0 }}>
-          <p style={{
-            fontSize: 11, fontWeight: 600, letterSpacing: '0.09em',
-            textTransform: 'uppercase', color: 'var(--text-3)',
-          }}>
+          style={{ ...fade, gap: 0 }}>
+
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--text-3)' }}>
             Съедено
           </p>
-          <p style={{
-            fontSize: 50, fontWeight: 200, lineHeight: 1.05,
-            letterSpacing: '-0.04em', color: 'var(--text-1)', marginTop: 3,
-          }}>
-            {eaten.toLocaleString('ru')}
-          </p>
-          <p style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>
-            из {goalKcal.toLocaleString('ru')}
-          </p>
 
-          {/* Deficit / surplus chip */}
+          {/* Fixed width prevents layout shift when digit count changes */}
+          <div style={{ minWidth: 172, textAlign: 'center', marginTop: 4 }}>
+            <span style={{
+              fontSize: 50, fontWeight: 200, lineHeight: 1.05,
+              letterSpacing: '-0.04em', color: 'var(--text-1)',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {tweenedEaten.toLocaleString('ru')}
+            </span>
+          </div>
+
+          {/* Status chip with directional arrow */}
           <div style={{
             marginTop: 10,
-            padding: '3px 10px', borderRadius: 20,
-            background: isDeficit ? 'rgba(48,209,88,0.13)' : 'rgba(255,69,58,0.14)',
-            border: `1px solid ${isDeficit ? 'rgba(48,209,88,0.30)' : 'rgba(255,69,58,0.30)'}`,
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '4px 11px', borderRadius: 20,
+            background: isDeficit ? 'rgba(48,209,88,0.12)' : 'rgba(255,69,58,0.14)',
+            border: `1px solid ${isDeficit ? 'rgba(48,209,88,0.26)' : 'rgba(255,69,58,0.28)'}`,
           }}>
-            <p style={{
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"
+              stroke={isDeficit ? '#30d158' : '#ff453a'}
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {isDeficit
+                ? <polyline points="2,3.5 5,6.5 8,3.5" />
+                : <polyline points="2,6.5 5,3.5 8,6.5" />}
+            </svg>
+            <span style={{
               fontSize: 11, fontWeight: 600, letterSpacing: '0.01em',
+              fontVariantNumeric: 'tabular-nums',
               color: isDeficit ? '#30d158' : '#ff453a',
             }}>
-              {isDeficit ? '−' : '+'}{Math.abs(deficit).toLocaleString('ru')}&thinsp;{isDeficit ? 'дефицит' : 'профицит'}
-            </p>
+              {Math.abs(tweenedDef).toLocaleString('ru')}&thinsp;{isDeficit ? 'дефицит' : 'профицит'}
+            </span>
           </div>
         </div>
       </div>

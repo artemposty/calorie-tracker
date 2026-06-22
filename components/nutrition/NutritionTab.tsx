@@ -39,8 +39,7 @@ export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, ad
 
   return (
     <>
-      {/* paddingBottom = tab-bar + FAB + gap so last meal is never hidden */}
-      <div className="flex flex-col gap-4" style={{ paddingBottom: 'calc(140px + max(env(safe-area-inset-bottom), 8px))' }}>
+      <div className="flex flex-col gap-4" style={{ paddingBottom: 'calc(164px + max(env(safe-area-inset-bottom), 8px))' }}>
         <ModuleHeader
           onMenuOpen={onMenuOpen}
           date={subTab === 'tracker' ? date : undefined}

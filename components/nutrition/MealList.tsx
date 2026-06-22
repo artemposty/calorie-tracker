@@ -163,7 +163,7 @@ export function MealList({ entries, onDelete }: Props) {
                     {entry.grams} г · Б {Math.round(entry.p * 10) / 10} · Ж {Math.round(entry.f * 10) / 10} · У {Math.round(entry.c * 10) / 10}
                   </p>
                 </div>
-                <p className="text-sm font-bold tabular-nums shrink-0" style={{ color: 'var(--kcal)' }}>
+                <p className="text-sm font-bold tabular-nums shrink-0" style={{ color: 'var(--text-2)' }}>
                   {Math.round(entry.kcal)} ккал
                 </p>
               </div>
