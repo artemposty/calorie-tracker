@@ -64,7 +64,7 @@ function buildConicGradient(eatenFrac: number, goalFrac: number): string {
   }
 
   stops.push(`${T} 360deg`);
-  return `conic-gradient(from -90deg at 50% 50%, ${stops.join(', ')})`;
+  return `conic-gradient(${stops.join(', ')})`;
 }
 
 function endCapColor(eatenFrac: number, goalFrac: number): string {

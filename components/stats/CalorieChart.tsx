@@ -18,12 +18,10 @@ interface Props {
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number; dataKey: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
   const kcalP = payload.find(p => p.dataKey === 'kcal');
-  const expP  = payload.find(p => p.dataKey === 'exp');
   return (
     <div className="rounded-xl px-3 py-2" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
       <p className="text-xs" style={{ color: 'var(--text-3)' }}>{label}</p>
       {kcalP && <p className="text-sm font-bold tabular-nums" style={{ color: 'var(--text-1)' }}>{kcalP.value} ккал</p>}
-      {expP  && <p className="text-xs tabular-nums" style={{ color: 'var(--text-3)' }}>расход {expP.value}</p>}
     </div>
   );
 }
@@ -33,10 +31,21 @@ export function CalorieChart({ data, goals, baseTdee, tonnageByDate }: Props) {
   const yellowLow = Math.round(goal * 0.84);
   const redLow    = Math.round(goal * 0.73);
 
+  // Per-day expenditure for dot coloring
+  const expenditureByDate: Record<string, number> = {};
+  for (const d of data) {
+    expenditureByDate[d.date] = calcExpenditure(baseTdee, calcWorkoutKcal(tonnageByDate[d.date] ?? 0));
+  }
+
+  // Average expenditure for the static upper zone
+  const expValues = Object.values(expenditureByDate);
+  const avgExp = expValues.length > 0
+    ? Math.round(expValues.reduce((a, b) => a + b, 0) / expValues.length)
+    : baseTdee;
+
   const chartData = data.map(d => ({
     displayDate: d.displayDate,
     kcal: d.kcal,
-    exp: calcExpenditure(baseTdee, calcWorkoutKcal(tonnageByDate[d.date] ?? 0)),
     date: d.date,
   }));
 
@@ -49,7 +58,7 @@ export function CalorieChart({ data, goals, baseTdee, tonnageByDate }: Props) {
     );
   }
 
-  const maxVal = Math.max(...chartData.map(d => Math.max(d.kcal, d.exp)));
+  const maxVal = Math.max(...chartData.map(d => d.kcal), avgExp);
   const yMax   = Math.ceil((maxVal + 300) / 200) * 200;
 
   function dotColor(kcal: number, exp: number): string {
@@ -80,28 +89,32 @@ export function CalorieChart({ data, goals, baseTdee, tonnageByDate }: Props) {
       </div>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -8 }}>
-          {/* Zone bands */}
-          <ReferenceArea y1={0}         y2={redLow}    fill="rgba(255,69,58,0.06)"  ifOverflow="hidden" />
-          <ReferenceArea y1={redLow}    y2={yellowLow} fill="rgba(255,159,10,0.05)" ifOverflow="hidden" />
-          <ReferenceArea y1={yellowLow} y2={goal}      fill="rgba(48,209,88,0.06)"  ifOverflow="hidden" />
+          {/* ── Zone bands (bottom to top) ─────────────────────────── */}
+          <ReferenceArea y1={0}       y2={redLow}    fill="rgba(255,69,58,0.06)"  ifOverflow="hidden" />
+          <ReferenceArea y1={redLow}  y2={yellowLow} fill="rgba(255,159,10,0.05)" ifOverflow="hidden" />
+          <ReferenceArea y1={yellowLow} y2={goal}    fill="rgba(48,209,88,0.06)"  ifOverflow="hidden" />
+          <ReferenceArea y1={goal}    y2={avgExp}    fill="rgba(255,159,10,0.05)" ifOverflow="hidden" />
+          <ReferenceArea y1={avgExp}  y2={yMax}      fill="rgba(255,69,58,0.06)"  ifOverflow="hidden" />
 
-          <XAxis dataKey="displayDate" tick={{ fontSize: 10, fill: 'var(--text-4)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-          <YAxis domain={[0, yMax]} tick={{ fontSize: 10, fill: 'var(--text-4)' }} tickLine={false} axisLine={false} width={42} />
+          <XAxis dataKey="displayDate" tick={{ fontSize: 10, fill: 'var(--text-4)' }}
+            tickLine={false} axisLine={false} interval="preserveStartEnd" />
+          <YAxis domain={[0, yMax]} tick={{ fontSize: 10, fill: 'var(--text-4)' }}
+            tickLine={false} axisLine={false} width={42} />
           <Tooltip content={<CustomTooltip />} />
 
+          {/* ── Reference lines ───────────────────────────────────── */}
           <ReferenceLine y={goal} stroke="rgba(48,209,88,0.25)" strokeDasharray="4 4"
-            label={{ value: `цель ${goal}`, fontSize: 9, fill: 'rgba(48,209,88,0.45)', position: 'right' }} />
+            label={{ value: `цель`, fontSize: 9, fill: 'rgba(48,209,88,0.45)', position: 'right' }} />
+          <ReferenceLine y={avgExp} stroke="rgba(255,158,10,0.25)" strokeDasharray="4 4"
+            label={{ value: `расход`, fontSize: 9, fill: 'rgba(255,158,10,0.40)', position: 'right' }} />
 
-          {/* Dynamic expenditure line (varies per day) */}
-          <Line type="monotone" dataKey="exp" stroke="rgba(255,158,10,0.30)" strokeDasharray="5 3"
-            strokeWidth={1.5} dot={false} activeDot={false} isAnimationActive={false} />
-
-          {/* Intake line */}
+          {/* ── Intake line ───────────────────────────────────────── */}
           <Line type="monotone" dataKey="kcal" stroke="rgba(255,255,255,0.55)" strokeWidth={2}
             dot={(props: Record<string, unknown>) => {
-              const { cx, cy, payload } = props as { cx?: number; cy?: number; payload?: { kcal: number; exp: number } };
-              if (!cx || !cy || !payload || payload.kcal === 0) return <circle key="empty" r={0} />;
-              return <circle key={`d-${cx}`} cx={cx} cy={cy} r={4} fill={dotColor(payload.kcal, payload.exp)} stroke="var(--bg-card)" strokeWidth={2} />;
+              const { cx, cy, payload } = props as { cx?: number; cy?: number; payload?: { kcal: number; date: string } };
+              if (!cx || !cy || !payload || payload.kcal === 0) return <circle key="e" r={0} />;
+              const exp = expenditureByDate[payload.date] ?? avgExp;
+              return <circle key={`d-${cx}`} cx={cx} cy={cy} r={4} fill={dotColor(payload.kcal, exp)} stroke="var(--bg-card)" strokeWidth={2} />;
             }}
             activeDot={{ r: 5 }} connectNulls={false} isAnimationActive={false} />
         </LineChart>
