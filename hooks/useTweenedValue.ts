@@ -11,7 +11,7 @@ function easeOutCubic(t: number) {
  * On first render returns `target` immediately (no initial animation).
  * On subsequent target changes tweens over `duration` ms.
  */
-export function useTweenedValue(target: number, duration = 350): number {
+export function useTweenedValue(target: number, duration = 600): number {
   const [display, setDisplay]   = useState(target);
   const displayRef  = useRef(target);
   const targetRef   = useRef(target);

@@ -155,7 +155,7 @@ export function StatsTab({ nutritionData, goals }: Props) {
         </div>
       )}
 
-      <CalorieChart data={data} goals={goals} />
+      <CalorieChart data={data} goals={goals} baseTdee={baseTdee} tonnageByDate={tonnageByDate} />
       <MacroChart data={data} goals={goals} />
     </div>
   );
