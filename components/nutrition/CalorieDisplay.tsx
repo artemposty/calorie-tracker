@@ -46,27 +46,20 @@ function buildConicGradient(eatenFrac: number, goalFrac: number): string {
   return `conic-gradient(${stops.join(', ')})`;
 }
 
-function endCapColor(eatenFrac: number, goalFrac: number): string {
-  const B = 28 / 360;
-  if (eatenFrac <= goalFrac - B) return 'rgba(222,226,255,0.84)';
-  if (eatenFrac <= goalFrac + B) return 'rgba(255,158,10,0.88)';
-  if (eatenFrac <= 1 - B)       return 'rgba(255,158,10,0.88)';
-  return 'rgba(255,69,58,1)';
-}
 
 const RING_MASK = `radial-gradient(circle at 50% 50%, transparent ${INNER_R - 1}px, black ${INNER_R}px, black ${OUTER_R}px, transparent ${OUTER_R + 1}px)`;
 
 const BADGE: React.CSSProperties = {
   position: 'absolute',
   transform: 'translate(-50%, -50%)',
-  padding: '2px 7px',
-  borderRadius: 8,
+  padding: '3px 9px',
+  borderRadius: 9,
   background: 'var(--bg)',
-  boxShadow: '0 0 0 1px rgba(255,255,255,0.08)',
-  fontSize: 9,
+  boxShadow: '0 0 0 1px rgba(255,255,255,0.10)',
+  fontSize: 10,
   fontWeight: 600,
   fontVariantNumeric: 'tabular-nums',
-  color: 'var(--text-3)',
+  color: '#8a8a96',
   letterSpacing: '0.01em',
   whiteSpace: 'nowrap',
   pointerEvents: 'none',
@@ -97,7 +90,6 @@ export function CalorieDisplay({ totals, goals, expenditure, workoutKcal }: Prop
   const eatenAngle = eatenFrac * 360;
   const goalInner  = toXY(goalAngle, R - 7);
   const goalOuter  = toXY(goalAngle, R + 8);
-  const endPos     = toXY(eatenAngle, R);
 
   // Badge positions: slightly outside ring
   const goalBadgePos = toXY(goalAngle, R + 20);
@@ -111,7 +103,6 @@ export function CalorieDisplay({ totals, goals, expenditure, workoutKcal }: Prop
                          goalBadgePos.x > CX + 20 ? 'translateX(-10%)' : 'translateX(-50%)';
 
   const gradient = buildConicGradient(eatenFrac, goalFrac);
-  const capColor = endCapColor(eatenFrac, goalFrac);
 
   const ease = 'cubic-bezier(0.2,0,0,1)';
   const fade: React.CSSProperties = {
@@ -153,12 +144,22 @@ export function CalorieDisplay({ totals, goals, expenditure, workoutKcal }: Prop
               />
             </g>
           )}
-          {/* Endpoint caps */}
+          {/* Rounded caps: tiny SVG arcs with strokeLinecap round */}
           {eatenFrac > 0.01 && (
-            <>
-              <circle cx={CX} cy={CY - R} r={SW / 2} fill="rgba(222,226,255,0.84)" />
-              <circle cx={endPos.x} cy={endPos.y} r={SW / 2} fill={capColor} />
-            </>
+            <g transform="rotate(-90 120 120)">
+              {/* Start cap at 0° (12 o'clock) */}
+              <circle cx={CX} cy={CY} r={R} fill="none"
+                stroke="rgba(222,226,255,0.84)" strokeWidth={SW} strokeLinecap="round"
+                strokeDasharray={`0.5 ${CIRC}`} strokeDashoffset={0} />
+              {/* End cap at eatenAngle */}
+              <circle cx={CX} cy={CY} r={R} fill="none"
+                stroke={eatenFrac <= goalFrac ? 'rgba(222,226,255,0.84)'
+                      : eatenFrac >= 1 ? 'rgba(255,69,58,1)'
+                      : 'rgba(255,158,10,0.88)'}
+                strokeWidth={SW} strokeLinecap="round"
+                strokeDasharray={`0.5 ${CIRC}`}
+                strokeDashoffset={-(eatenAngle / 360 * CIRC)} />
+            </g>
           )}
           {/* Expenditure tick (12 o'clock) */}
           <line x1={expInner.x} y1={expInner.y} x2={expOuter.x} y2={expOuter.y}
@@ -177,15 +178,22 @@ export function CalorieDisplay({ totals, goals, expenditure, workoutKcal }: Prop
             top: expBadgePos.y,
             display: 'flex', alignItems: 'center', gap: 4,
           }}>
-            {tweenedExp.toLocaleString('ru')}
+            {/* Fire icon */}
+            <svg width="11" height="12" viewBox="0 0 889 1280" fill="#8a8a96" stroke="none" style={{ transform: 'scaleY(-1)' }}>
+              <path d="M333 1264c-20-141-53-257-103-355-27-53-50-90-107-168-46-64-61-87-79-122-28-54-42-112-44-176-3-113 44-223 136-319 44-46 101-89 148-113 23-11 24-11 54-11l25 0 0 0c0 0-9 11-20 24-22 27-35 44-49 65-51 78-77 149-72 204 3 31 9 54 21 79 10 20 19 35 61 92 31 43 47 66 65 95 37 61 70 132 94 204l5 14 11-10c20-18 53-51 68-66 49-53 78-97 99-153 12-33 24-80 27-108 1-16 1-62-2-80-12-95-43-203-95-327-6-15-12-29-13-30l-1-2 15 0 16 0 23 18c39 30 57 46 84 72 94 92 151 192 176 305 8 38 11 68 11 111 0 43-3 70-11 112-31 158-126 316-281 469-64 63-130 118-213 178l-21 15-14 0-13 0-2-16z"/>
+            </svg>
+            {/* Dumbbell icon (workout days only) */}
             {workoutKcal > 0 && (
-              <svg width="10" height="6" viewBox="0 0 14 8" fill="none"
-                stroke="var(--text-4)" strokeWidth="1.5" strokeLinecap="round">
+              <svg width="11" height="7" viewBox="0 0 14 8" fill="none"
+                stroke="#8a8a96" strokeWidth="1.5" strokeLinecap="round">
                 <line x1="4" y1="4" x2="10" y2="4" />
                 <line x1="3" y1="1.5" x2="3" y2="6.5" />
                 <line x1="11" y1="1.5" x2="11" y2="6.5" />
+                <line x1="1.5" y1="2.5" x2="1.5" y2="5.5" />
+                <line x1="12.5" y1="2.5" x2="12.5" y2="5.5" />
               </svg>
             )}
+            {tweenedExp.toLocaleString('ru')}
           </div>
           {/* Goal badge — at goal angle */}
           <div style={{
@@ -193,7 +201,16 @@ export function CalorieDisplay({ totals, goals, expenditure, workoutKcal }: Prop
             left: goalBadgePos.x,
             top: goalBadgePos.y,
             transform: `${goalBadgeAlign} translateY(-50%)`,
+            display: 'flex', alignItems: 'center', gap: 4,
           }}>
+            {/* Crosshair icon */}
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="#8a8a96" strokeWidth="1.5" strokeLinecap="round">
+              <circle cx="8" cy="8" r="5" />
+              <line x1="8" y1="1" x2="8" y2="4" />
+              <line x1="8" y1="12" x2="8" y2="15" />
+              <line x1="1" y1="8" x2="4" y2="8" />
+              <line x1="12" y1="8" x2="15" y2="8" />
+            </svg>
             {goalKcal.toLocaleString('ru')}
           </div>
         </div>
