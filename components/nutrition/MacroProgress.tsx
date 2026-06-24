@@ -35,7 +35,12 @@ function SmallRing({ value, goal, color, label, delay }: {
   // Outer ring: overflow beyond goal, cap at 1 revolution
   const ovProg   = mounted && isOver ? Math.max(0, Math.min((tweened - goal) / goal, 1)) : 0;
 
-  const fade: React.CSSProperties = { opacity: mounted ? 1 : 0, transition: 'opacity 0.4s ease' };
+  const fade: React.CSSProperties = {
+    opacity: mounted ? 1 : 0,
+    transform: mounted ? 'translateY(0)' : 'translateY(6px)',
+    filter: mounted ? 'blur(0px)' : 'blur(2px)',
+    transition: 'opacity 0.4s cubic-bezier(0.2,0,0,1), transform 0.4s cubic-bezier(0.2,0,0,1), filter 0.4s cubic-bezier(0.2,0,0,1)',
+  };
 
   return (
     <div className="flex flex-col items-center gap-1.5 flex-1">

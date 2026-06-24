@@ -104,7 +104,12 @@ export function CalorieDisplay({ totals, goals, expenditure, workoutKcal }: Prop
   const gradient = buildConicGradient(eatenFrac, goalFrac);
   const capColor = endCapColor(eatenFrac, goalFrac);
 
-  const fade: React.CSSProperties = { opacity: mounted ? 1 : 0, transition: 'opacity 0.5s ease' };
+  const fade: React.CSSProperties = {
+    opacity: mounted ? 1 : 0,
+    transform: mounted ? 'translateY(0)' : 'translateY(8px)',
+    filter: mounted ? 'blur(0px)' : 'blur(3px)',
+    transition: 'opacity 0.45s cubic-bezier(0.2,0,0,1), transform 0.45s cubic-bezier(0.2,0,0,1), filter 0.45s cubic-bezier(0.2,0,0,1)',
+  };
 
   return (
     <div className="flex justify-center">

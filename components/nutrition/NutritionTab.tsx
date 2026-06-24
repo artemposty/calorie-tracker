@@ -58,7 +58,9 @@ export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, ad
               workoutKcal={workoutKcal}
             />
             <MacroProgress totals={totals} goals={goals} />
-            <MealList entries={entries} onDelete={id => deleteEntry(date, id)} />
+            <div className="enter-stagger" style={{ animationDelay: '160ms' }}>
+              <MealList entries={entries} onDelete={id => deleteEntry(date, id)} />
+            </div>
           </>
         )}
 
@@ -71,7 +73,7 @@ export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, ad
       {subTab === 'tracker' && (
         <button
           onClick={() => { haptic('medium'); setShowAdd(true); }}
-          className="fixed z-10 flex items-center justify-center active:scale-90 transition-transform duration-100"
+          className="fixed z-10 flex items-center justify-center active:scale-[0.96] transition-transform duration-150 ease-out"
           style={{
             right: 20,
             bottom: 'calc(56px + max(env(safe-area-inset-bottom), 8px) + 16px)',
@@ -112,7 +114,7 @@ export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, ad
           <button
             key={id}
             onClick={() => { haptic('light'); setSubTab(id); }}
-            className="flex-1 flex flex-col items-center gap-0.5 py-2 active:opacity-60"
+            className="flex-1 flex flex-col items-center gap-0.5 py-2 active:scale-[0.96] transition-transform duration-150 ease-out"
             style={{ color: subTab === id ? 'var(--text-1)' : 'var(--text-4)' }}
           >
             {icon}
