@@ -11,11 +11,13 @@ interface Props {
 }
 
 type ScanState = 'starting' | 'scanning' | 'denied' | 'no-camera' | 'error';
+type FocusRing = { x: number; y: number; key: number };
 
 export function BarcodeScanner({ onDetected, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const [state, setState] = useState<ScanState>('starting');
+  const [focusRing, setFocusRing] = useState<FocusRing | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,12 +27,25 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
       BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
       BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
     ]);
-    const reader = new BrowserMultiFormatReader(hints);
+    // Scan much more frequently than the 500ms default — barcodes decode
+    // faster when we don't wait between attempts.
+    const reader = new BrowserMultiFormatReader(hints, {
+      delayBetweenScanAttempts: 60,
+      delayBetweenScanSuccess: 200,
+    });
 
     (async () => {
       try {
         const controls = await reader.decodeFromConstraints(
-          { video: { facingMode: 'environment' } },
+          {
+            video: {
+              facingMode: 'environment',
+              // Higher resolution = smaller/farther barcodes stay readable
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet],
+            },
+          },
           videoRef.current!,
           (result) => {
             if (result && !cancelled) {
@@ -59,20 +74,69 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
     };
   }, [onDetected]);
 
+  async function handleTapFocus(e: React.MouseEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setFocusRing({ x, y, key: Date.now() });
+    haptic('light');
+
+    // Best-effort manual focus — support varies a lot by browser/device,
+    // so this silently no-ops where unsupported. The visual ring above
+    // always gives feedback regardless.
+    const track = (videoRef.current?.srcObject as MediaStream | null)?.getVideoTracks?.()[0];
+    if (!track?.getCapabilities) return;
+    try {
+      const caps = track.getCapabilities() as MediaTrackCapabilities & { focusMode?: string[]; pointsOfInterest?: unknown };
+      const nx = x / rect.width;
+      const ny = y / rect.height;
+      if (caps.focusMode?.includes('single-shot')) {
+        await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' } as MediaTrackConstraintSet] });
+      } else if (caps.pointsOfInterest && caps.focusMode?.includes('manual')) {
+        await track.applyConstraints({ advanced: [{ pointsOfInterest: [{ x: nx, y: ny }] } as unknown as MediaTrackConstraintSet] });
+      } else if (caps.focusMode?.includes('continuous')) {
+        // Toggle off/on to force a fresh autofocus pass
+        await track.applyConstraints({ advanced: [{ focusMode: 'manual' } as MediaTrackConstraintSet] });
+        await track.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] });
+      }
+    } catch {
+      // unsupported on this device/browser — ignore
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50" style={{ background: '#000' }}>
-      <video
-        ref={videoRef}
-        className="absolute inset-0 w-full h-full object-cover"
-        muted
-        playsInline
-      />
+      <div className="absolute inset-0" onClick={handleTapFocus}>
+        <video
+          ref={videoRef}
+          className="absolute inset-0 w-full h-full object-cover"
+          muted
+          playsInline
+        />
+      </div>
 
-      {/* Dark overlay with cutout frame */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+      {/* Tap-to-focus ring */}
+      {focusRing && (
+        <div
+          key={focusRing.key}
+          className="absolute pointer-events-none"
+          style={{
+            left: focusRing.x, top: focusRing.y,
+            width: 64, height: 64, marginLeft: -32, marginTop: -32,
+            borderRadius: '50%',
+            border: '1.5px solid rgba(255,255,255,0.85)',
+            animation: 'focus-ring-pulse 0.6s ease-out forwards',
+          }}
+          onAnimationEnd={() => setFocusRing(null)}
+        />
+      )}
+
+      {/* Dark overlay with cutout frame — ~45% of viewport height */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-6">
         <div
           style={{
-            width: 260, height: 160, borderRadius: 16,
+            width: '100%', maxWidth: 380, height: '45vh', maxHeight: 420,
+            borderRadius: 20,
             boxShadow: '0 0 0 2000px rgba(0,0,0,0.55)',
             border: '2px solid rgba(255,255,255,0.6)',
           }}
@@ -100,23 +164,36 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
         </div>
       )}
 
-      {/* Close button */}
+      {/* Top gradient scrim + close button, integrated like native camera UIs */}
+      <div
+        className="absolute inset-x-0 top-0 pointer-events-none"
+        style={{ height: 110, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)' }}
+      />
       <button
         onClick={() => { haptic('light'); onClose(); }}
-        className="absolute flex items-center justify-center active:scale-90 transition-transform"
+        className="absolute flex items-center justify-center active:scale-90 transition-transform duration-150 ease-out"
         style={{
-          top: 'calc(env(safe-area-inset-top, 44px) + 12px)',
-          right: 16,
+          top: 'calc(env(safe-area-inset-top, 44px) + 10px)',
+          left: 16,
           width: 40, height: 40, borderRadius: 20,
-          background: 'rgba(255,255,255,0.15)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(255,255,255,0.12)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
         }}
         aria-label="Закрыть"
       >
-        <svg width="18" height="18" fill="none" stroke="#fff" strokeWidth="2.2" viewBox="0 0 24 24">
+        <svg width="17" height="17" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" viewBox="0 0 24 24">
           <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </button>
+
+      <style jsx>{`
+        @keyframes focus-ring-pulse {
+          0%   { transform: scale(1.15); opacity: 0; }
+          25%  { opacity: 1; }
+          100% { transform: scale(0.85); opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }
