@@ -47,6 +47,7 @@ export interface UserFoodItem {
   f: number;
   c: number;
   defaultGrams?: number;
+  barcode?: string;
 }
 
 export interface AppExport {

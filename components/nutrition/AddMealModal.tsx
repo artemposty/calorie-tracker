@@ -1,13 +1,16 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { FoodEntry, UserFoodItem } from '@/lib/types';
 import { calcFromPer100 } from '@/lib/storage';
 import { haptic } from '@/lib/haptics';
 import { useUserFoods } from '@/hooks/useUserFoods';
+import { fetchProductByBarcode } from '@/lib/openFoodFacts';
+import { BarcodeScanner } from './BarcodeScanner';
 
-type ModalTab = 'custom' | 'db';
+type ModalTab = 'custom' | 'db' | 'scan';
 type DbState  = 'list' | 'selected' | 'add-to-db';
+type ScanState = 'idle' | 'scanning' | 'looking-up' | 'found' | 'not-found';
 
 interface Props {
   onAdd: (entry: Omit<FoodEntry, 'id' | 'time'>) => void;
@@ -69,7 +72,7 @@ function PrimaryBtn({ onClick, disabled, children }: {
 
 export function AddMealModal({ onAdd, onClose }: Props) {
   const [tab, setTab] = useState<ModalTab>('custom');
-  const { foods, addFood, deleteFood } = useUserFoods();
+  const { foods, addFood, deleteFood, findByBarcode } = useUserFoods();
 
   const [cName, setCName] = useState('');
   const [cP, setCP] = useState('');
@@ -86,6 +89,78 @@ export function AddMealModal({ onAdd, onClose }: Props) {
   const [addF, setAddF]             = useState('');
   const [addC, setAddC]             = useState('');
   const [addDefaultGrams, setAddDefaultGrams] = useState('');
+
+  // ── Scan tab ─────────────────────────────────────────────────────────
+  const [scanState, setScanState]     = useState<ScanState>('idle');
+  const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
+  const [scanSource, setScanSource]   = useState<'cache' | 'off' | null>(null);
+  const [sName, setSName] = useState('');
+  const [sP, setSP] = useState('');
+  const [sF, setSF] = useState('');
+  const [sC, setSC] = useState('');
+  const [sGrams, setSGrams] = useState('100');
+
+  const handleDetected = useCallback(async (barcode: string) => {
+    setScanState('looking-up');
+    setScannedBarcode(barcode);
+
+    const cached = findByBarcode(barcode);
+    if (cached) {
+      setSName(cached.name);
+      setSP(String(cached.p)); setSF(String(cached.f)); setSC(String(cached.c));
+      setSGrams(String(cached.defaultGrams ?? 100));
+      setScanSource('cache');
+      setScanState('found');
+      return;
+    }
+
+    const product = await fetchProductByBarcode(barcode);
+    if (product) {
+      setSName(product.name);
+      setSP(String(product.p)); setSF(String(product.f)); setSC(String(product.c));
+      setSGrams('100');
+      setScanSource('off');
+      setScanState('found');
+    } else {
+      setScanState('not-found');
+    }
+  }, [findByBarcode]);
+
+  function resetScan() {
+    setScanState('idle');
+    setScannedBarcode(null);
+    setScanSource(null);
+    setSName(''); setSP(''); setSF(''); setSC(''); setSGrams('100');
+  }
+
+  const sGramsNum   = num(sGrams);
+  const sKcalPer100 = macrosToKcal(sP, sF, sC);
+  const scanPreview = sGramsNum > 0 && sKcalPer100 > 0 ? {
+    kcal: Math.round(sKcalPer100 * sGramsNum / 100),
+    p: calcFromPer100(num(sP), sGramsNum),
+    f: calcFromPer100(num(sF), sGramsNum),
+    c: calcFromPer100(num(sC), sGramsNum),
+  } : null;
+
+  function handleAddFromScan() {
+    if (!sName.trim() || sGramsNum <= 0) return;
+    haptic('success');
+    onAdd({
+      name: sName.trim(), grams: sGramsNum,
+      kcal: Math.round(sKcalPer100 * sGramsNum / 100),
+      p: calcFromPer100(num(sP), sGramsNum),
+      f: calcFromPer100(num(sF), sGramsNum),
+      c: calcFromPer100(num(sC), sGramsNum),
+    });
+    // Cache newly-scanned products locally so the next scan is instant
+    if (scanSource === 'off' && scannedBarcode) {
+      addFood({
+        name: sName.trim(), kcal: sKcalPer100, p: num(sP), f: num(sF), c: num(sC),
+        barcode: scannedBarcode,
+      });
+    }
+    onClose();
+  }
 
   const filteredFoods = useMemo(
     () => foods.filter(f => f.name.toLowerCase().includes(dbSearch.toLowerCase())),
@@ -152,6 +227,7 @@ export function AddMealModal({ onAdd, onClose }: Props) {
   const TABS: { id: ModalTab; label: string }[] = [
     { id: 'custom', label: 'Свой' },
     { id: 'db', label: 'База' },
+    { id: 'scan', label: 'Скан' },
   ];
 
   return (
@@ -365,6 +441,111 @@ export function AddMealModal({ onAdd, onClose }: Props) {
                   </div>
                   <PrimaryBtn onClick={handleSaveToDb} disabled={!addName.trim()}>Сохранить в базу</PrimaryBtn>
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* SCAN TAB */}
+          {tab === 'scan' && (
+            <div className="px-5 pb-5 flex flex-col gap-4">
+              {scanState === 'idle' && (
+                <div className="flex flex-col items-center gap-4 py-10">
+                  <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center"
+                    style={{ background: 'var(--bg-elevated)' }}
+                  >
+                    <svg width="28" height="28" fill="none" stroke="var(--text-2)" strokeWidth="1.8" viewBox="0 0 24 24">
+                      <rect x="3" y="5" width="2" height="14" /><rect x="7" y="5" width="1" height="14" />
+                      <rect x="10" y="5" width="3" height="14" /><rect x="15" y="5" width="1" height="14" />
+                      <rect x="17" y="5" width="2" height="14" /><rect x="20" y="5" width="1" height="14" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-center" style={{ color: 'var(--text-3)' }}>
+                    Отсканируй штрихкод с упаковки —{' '}БЖУ подтянутся автоматически
+                  </p>
+                  <PrimaryBtn onClick={() => setScanState('scanning')}>Сканировать штрихкод</PrimaryBtn>
+                </div>
+              )}
+
+              {scanState === 'scanning' && (
+                <BarcodeScanner onDetected={handleDetected} onClose={() => setScanState('idle')} />
+              )}
+
+              {scanState === 'looking-up' && (
+                <div className="flex flex-col items-center gap-3 py-14">
+                  <div className="skeleton" style={{ width: 40, height: 40, borderRadius: 20 }} />
+                  <p className="text-sm" style={{ color: 'var(--text-3)' }}>Ищем продукт…</p>
+                </div>
+              )}
+
+              {scanState === 'not-found' && (
+                <div className="flex flex-col items-center gap-4 py-10 text-center">
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>Продукт не найден</p>
+                  <p className="text-xs" style={{ color: 'var(--text-3)' }}>
+                    Штрихкод {scannedBarcode} нет в базе Open Food Facts. Добавь БЖУ вручную во вкладке «Свой».
+                  </p>
+                  <div className="flex gap-2 w-full">
+                    <button
+                      onClick={() => { haptic('light'); resetScan(); }}
+                      className="flex-1 py-3 rounded-xl text-sm font-semibold"
+                      style={{ background: 'var(--bg-elevated)', color: 'var(--text-2)' }}
+                    >
+                      Сканировать снова
+                    </button>
+                    <button
+                      onClick={() => { haptic('light'); setCName(''); setTab('custom'); }}
+                      className="flex-1 py-3 rounded-xl text-sm font-semibold"
+                      style={{ background: '#ffffff', color: '#0a0a0b' }}
+                    >
+                      Ввести вручную
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {scanState === 'found' && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                      style={{
+                        background: scanSource === 'cache' ? 'rgba(48,209,88,0.14)' : 'rgba(10,132,255,0.14)',
+                        color: scanSource === 'cache' ? 'var(--success)' : 'var(--carbs)',
+                      }}
+                    >
+                      {scanSource === 'cache' ? '✓ Уже сканировал' : '✓ Open Food Facts'}
+                    </span>
+                    <button onClick={() => { haptic('light'); resetScan(); }} className="text-xs font-medium" style={{ color: 'var(--text-3)' }}>
+                      Сканировать другой
+                    </button>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-3)' }}>Название</label>
+                    <DarkInput type="text" value={sName} onChange={e => setSName(e.target.value)} placeholder="Название продукта" />
+                  </div>
+                  <p className="text-xs" style={{ color: 'var(--text-3)' }}>БЖУ на 100 г — ккал авто:</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[{ label: 'Белки', value: sP, set: setSP }, { label: 'Жиры', value: sF, set: setSF }, { label: 'Углеводы', value: sC, set: setSC }].map(({ label, value, set }) => (
+                      <div key={label}>
+                        <label className="text-xs block mb-1.5" style={{ color: 'var(--text-3)' }}>{label}</label>
+                        <DarkInput type="number" inputMode="decimal" value={value} onChange={e => set(e.target.value)} placeholder="0" />
+                      </div>
+                    ))}
+                  </div>
+                  {sKcalPer100 > 0 && (
+                    <p className="text-xs" style={{ color: 'var(--text-3)' }}>
+                      ≈ <span className="font-bold" style={{ color: 'var(--kcal)' }}>{sKcalPer100}</span> ккал / 100 г
+                    </p>
+                  )}
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-3)' }}>Граммы</label>
+                    <DarkInput type="number" inputMode="decimal" value={sGrams} onChange={e => setSGrams(e.target.value)} />
+                  </div>
+                  {scanPreview && <PreviewRow {...scanPreview} />}
+                  <PrimaryBtn onClick={handleAddFromScan} disabled={!sName.trim() || sGramsNum <= 0}>
+                    Добавить
+                  </PrimaryBtn>
+                </>
               )}
             </div>
           )}

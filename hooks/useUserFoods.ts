@@ -30,6 +30,7 @@ export function useUserFoods() {
             f: Number(row.f),
             c: Number(row.c),
             defaultGrams: row.default_grams ? Number(row.default_grams) : undefined,
+            barcode: row.barcode ? String(row.barcode) : undefined,
           })));
         }
       });
@@ -38,10 +39,11 @@ export function useUserFoods() {
   function addFood(food: Omit<UserFoodItem, 'id'>) {
     const id = newId();
     setFoods(prev => [{ id, ...food }, ...prev]);
-    const { defaultGrams, ...rest } = food;
+    const { defaultGrams, barcode, ...rest } = food;
     sb(supabase.from('user_foods').insert({
       id, user_id: USER_ID, ...rest,
       ...(defaultGrams !== undefined ? { default_grams: defaultGrams } : {}),
+      ...(barcode !== undefined ? { barcode } : {}),
     }));
   }
 
@@ -50,5 +52,10 @@ export function useUserFoods() {
     sb(supabase.from('user_foods').delete().eq('id', id).eq('user_id', USER_ID));
   }
 
-  return { foods, addFood, deleteFood };
+  /** Look for a previously-scanned product with this barcode in the local cache. */
+  function findByBarcode(barcode: string): UserFoodItem | undefined {
+    return foods.find(f => f.barcode === barcode);
+  }
+
+  return { foods, addFood, deleteFood, findByBarcode };
 }
