@@ -19,7 +19,7 @@ interface Props {
   goals: Goals;
   nutritionData: Record<string, FoodEntry[]>;
   getDayEntries: (date: string) => FoodEntry[];
-  addEntry: (date: string, entry: Omit<FoodEntry, 'id' | 'time'>) => void;
+  addEntry: (date: string, entry: Omit<FoodEntry, 'id' | 'time'>) => string;
   addEntries: (date: string, entries: Omit<FoodEntry, 'id' | 'time'>[]) => void;
   deleteEntry: (date: string, id: string) => void;
   onMenuOpen: () => void;
@@ -125,7 +125,9 @@ export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, ad
 
       {showAdd && (
         <AddMealModal
+          nutritionData={nutritionData}
           onAdd={e => addEntry(date, e)}
+          onDelete={id => deleteEntry(date, id)}
           onClose={() => setShowAdd(false)}
         />
       )}

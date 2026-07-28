@@ -50,11 +50,12 @@ export function useNutrition() {
       });
   }, []);
 
-  const addEntry = useCallback((date: string, entry: Omit<FoodEntry, 'id' | 'time'>) => {
+  const addEntry = useCallback((date: string, entry: Omit<FoodEntry, 'id' | 'time'>): string => {
     const id = newId();
     const full: FoodEntry = { ...entry, id, time: new Date().toISOString() };
     setData(prev => ({ ...prev, [date]: [...(prev[date] ?? []), full] }));
     sb(supabase.from('nutrition_entries').insert({ id, user_id: USER_ID, date, ...entry }));
+    return id;
   }, []);
 
   const addEntries = useCallback((date: string, entries: Omit<FoodEntry, 'id' | 'time'>[]) => {

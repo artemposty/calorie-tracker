@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Редизайн добавления еды — быстрый повтор</title>
+<style>
+  /* ── Chrome tokens (this explanatory page's own shell — adapts to viewer theme) ── */
+  :root {
+    --chrome-bg: #f2f1ee;
+    --chrome-bg-2: #ffffff;
+    --chrome-text: #17171a;
+    --chrome-text-2: #63636b;
+    --chrome-text-3: #97979e;
+    --chrome-border: #e3e2de;
+    --chrome-accent: #ff375f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --chrome-bg: #0d0d0f;
+      --chrome-bg-2: #17171a;
+      --chrome-text: #f2f2f3;
+      --chrome-text-2: #9d9da4;
+      --chrome-text-3: #6b6b72;
+      --chrome-border: #232327;
+    }
+  }
+  :root[data-theme="dark"]  { --chrome-bg:#0d0d0f; --chrome-bg-2:#17171a; --chrome-text:#f2f2f3; --chrome-text-2:#9d9da4; --chrome-text-3:#6b6b72; --chrome-border:#232327; }
+  :root[data-theme="light"] { --chrome-bg:#f2f1ee; --chrome-bg-2:#ffffff; --chrome-text:#17171a; --chrome-text-2:#63636b; --chrome-text-3:#97979e; --chrome-border:#e3e2de; }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--chrome-bg);
+    color: var(--chrome-text);
+    font-family: system-ui, -apple-system, "SF Pro Text", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { overflow-x: hidden; }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  .intro { max-width: 640px; display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--chrome-accent);
+  }
+  h1 { font-size: 28px; font-weight: 650; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+  .intro p { font-size: 15px; line-height: 1.55; color: var(--chrome-text-2); margin: 0; text-wrap: pretty; }
+
+  .layout {
+    display: flex;
+    gap: 48px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  /* ── Phone frame ─────────────────────────────────────────────────── */
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; flex-shrink: 0; }
+  .phone-caption { font-size: 12px; color: var(--chrome-text-3); font-weight: 600; letter-spacing: 0.02em; }
+
+  .phone {
+    width: 375px;
+    height: 780px;
+    border-radius: 46px;
+    background: #050506;
+    padding: 12px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.06) inset,
+      0 30px 60px -20px rgba(0,0,0,0.5);
+    position: relative;
+  }
+  .phone-screen {
+    width: 100%; height: 100%;
+    border-radius: 36px;
+    overflow: hidden;
+    position: relative;
+    background: #0a0a0b;
+  }
+  .notch {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 100px; height: 26px; border-radius: 14px; background: #000;
+    z-index: 50;
+  }
+
+  /* App tokens — fixed dark, mirrors the real product (no light theme exists there) */
+  .phone-screen {
+    --bg: #0a0a0b;
+    --bg-card: #16161a;
+    --bg-elevated: #1c1c20;
+    --border: #26262d;
+    --border-sub: #1f1f24;
+    --text-1: #f4f4f5;
+    --text-2: #a1a1aa;
+    --text-3: #71717a;
+    --text-4: #3f3f46;
+    --success: #30d158;
+    --fat: #ff9f0a;
+    --carbs: #0a84ff;
+    --protein: #30d158;
+    --danger: #ff453a;
+    font-family: system-ui, -apple-system, "SF Pro Display", "SF Pro Text", sans-serif;
+  }
+
+  .app-backdrop {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    filter: blur(3px);
+    opacity: 0.55;
+  }
+  .ghost-ring {
+    width: 190px; height: 190px; border-radius: 50%;
+    border: 11px solid rgba(255,255,255,0.08);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .ghost-ring::before {
+    content: ''; position: absolute; inset: -11px;
+    border-radius: 50%;
+    background: conic-gradient(rgba(226,228,255,0.55) 0deg 260deg, transparent 260deg 360deg);
+    -webkit-mask: radial-gradient(circle, transparent 62%, black 63%, black 76%, transparent 77%);
+            mask: radial-gradient(circle, transparent 62%, black 63%, black 76%, transparent 77%);
+  }
+  .ghost-ring span { font-size: 34px; font-weight: 200; color: rgba(244,244,245,0.5); font-variant-numeric: tabular-nums; }
+
+  .modal-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.68);
+  }
+
+  /* ── Sheet ────────────────────────────────────────────────────────── */
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 90%;
+    background: var(--bg-card);
+    border-radius: 26px 26px 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .sheet-handle { display: flex; justify-content: center; padding: 10px 0 4px; flex-shrink: 0; }
+  .sheet-handle span { width: 36px; height: 4px; border-radius: 2px; background: var(--bg-elevated); }
+
+  .sheet-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 18px 14px; flex-shrink: 0;
+  }
+  .sheet-header h2 { font-size: 17px; font-weight: 650; color: var(--text-1); margin: 0; }
+  .close-btn {
+    width: 28px; height: 28px; border-radius: 14px;
+    background: var(--bg-elevated); border: none;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-2); cursor: pointer;
+    transition: transform 150ms ease-out;
+  }
+  .close-btn:active { transform: scale(0.9); }
+
+  .sheet-body { flex: 1; overflow-y: auto; padding: 0 18px 18px; display: flex; flex-direction: column; gap: 16px; }
+  .sheet-body::-webkit-scrollbar { display: none; }
+
+  /* Search */
+  .search-row { display: flex; gap: 8px; flex-shrink: 0; }
+  .search-box {
+    flex: 1; position: relative; display: flex; align-items: center;
+  }
+  .search-box svg { position: absolute; left: 12px; pointer-events: none; color: var(--text-3); }
+  .search-box input {
+    width: 100%; padding: 10px 12px 10px 34px;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: 12px; color: var(--text-1); font-size: 14px;
+    outline: none; font-family: inherit;
+  }
+  .search-box input::placeholder { color: var(--text-3); }
+  .search-box input:focus { border-color: rgba(255,255,255,0.22); }
+
+  /* Quick action pills */
+  .quick-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .pill-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 9px 13px; border-radius: 12px;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    color: var(--text-2); font-size: 12.5px; font-weight: 600;
+    cursor: pointer; transition: transform 150ms ease-out, background 150ms;
+    white-space: nowrap;
+  }
+  .pill-btn:active { transform: scale(0.96); }
+  .pill-btn svg { flex-shrink: 0; }
+
+  /* Demo time toggle (annotation, not part of shipped UI) */
+  .demo-toggle {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 12px;
+    background: rgba(255,55,95,0.07); border: 1px dashed rgba(255,55,95,0.3);
+    flex-shrink: 0;
+  }
+  .demo-toggle-label { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: var(--chrome-accent); text-transform: uppercase; flex-shrink: 0; }
+  .demo-seg { display: flex; gap: 4px; flex: 1; }
+  .demo-seg button {
+    flex: 1; padding: 6px 4px; border-radius: 8px; border: none;
+    background: transparent; color: var(--text-3); font-size: 11.5px; font-weight: 600;
+    cursor: pointer; transition: background 150ms, color 150ms; font-family: inherit;
+  }
+  .demo-seg button.active { background: var(--bg-elevated); color: var(--text-1); }
+
+  /* Section labels */
+  .section-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--text-4); padding: 2px 2px 0;
+  }
+
+  /* Recent list */
+  .recent-list { display: flex; flex-direction: column; gap: 6px; }
+  .recent-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 14px;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    cursor: pointer; transition: transform 120ms ease-out, background 150ms;
+    position: relative; overflow: hidden;
+  }
+  .recent-row:active { transform: scale(0.985); }
+  .recent-row.added { animation: rowPulse 420ms ease-out; }
+  @keyframes rowPulse {
+    0%   { background: var(--bg-elevated); }
+    35%  { background: rgba(48,209,88,0.18); }
+    100% { background: var(--bg-elevated); }
+  }
+  .recent-icon {
+    width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+    background: rgba(255,255,255,0.05);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .recent-main { flex: 1; min-width: 0; }
+  .recent-name { font-size: 13.5px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .recent-meta { font-size: 11.5px; color: var(--text-3); margin-top: 1px; display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+  .time-badge {
+    font-size: 9.5px; font-weight: 700; color: var(--success);
+    background: rgba(48,209,88,0.12); border-radius: 6px; padding: 1px 5px;
+    letter-spacing: 0.01em;
+  }
+  .recent-kcal { font-size: 13px; font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .edit-btn {
+    width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+    background: rgba(255,255,255,0.05); border: none;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-3); cursor: pointer;
+  }
+  .edit-btn:active { background: rgba(255,255,255,0.1); }
+
+  /* Inline stepper (expanded edit state) */
+  .stepper-panel {
+    display: none;
+    align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--border-sub);
+  }
+  .recent-row.editing .stepper-panel { display: flex; }
+  .recent-row.editing { flex-direction: column; align-items: stretch; cursor: default; }
+  .stepper-panel .step-btn {
+    width: 30px; height: 30px; border-radius: 9px; border: none;
+    background: var(--bg-card); color: var(--text-1); font-size: 16px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .stepper-panel .step-val { font-size: 14px; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; }
+  .stepper-panel .confirm-btn {
+    padding: 7px 14px; border-radius: 9px; border: none;
+    background: #ffffff; color: #0a0a0b; font-size: 12.5px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+  }
+
+  /* DB list (plain, secondary) */
+  .db-list { display: flex; flex-direction: column; border-radius: 14px; border: 1px solid var(--border); overflow: hidden; }
+  .db-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; }
+  .db-row + .db-row { border-top: 1px solid var(--border-sub); }
+  .db-row-name { font-size: 13.5px; font-weight: 500; color: var(--text-1); }
+  .db-row-kcal { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+  .empty-hint { text-align: center; padding: 20px 10px; font-size: 12.5px; color: var(--text-4); }
+
+  /* Secondary panel (Скан / Свой placeholders) */
+  .secondary-panel {
+    display: none;
+    flex-direction: column; gap: 14px;
+    padding: 8px 2px 4px;
+  }
+  .secondary-panel.visible { display: flex; }
+  .back-link {
+    display: flex; align-items: center; gap: 5px;
+    color: var(--text-3); font-size: 13px; font-weight: 600;
+    background: none; border: none; cursor: pointer; padding: 0; font-family: inherit;
+    align-self: flex-start;
+  }
+  .scan-placeholder {
+    height: 260px; border-radius: 18px; border: 1.5px dashed var(--border);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    color: var(--text-3); text-align: center; padding: 20px;
+  }
+  .scan-placeholder svg { color: var(--text-4); }
+  .scan-placeholder p { font-size: 12.5px; margin: 0; line-height: 1.5; }
+  .form-preview { display: flex; flex-direction: column; gap: 10px; }
+  .form-field-mock { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 12px; padding: 12px; color: var(--text-4); font-size: 13px; }
+
+  .default-view { display: flex; flex-direction: column; gap: 16px; }
+  .default-view.hidden { display: none; }
+
+  /* Toast */
+  .toast {
+    position: absolute; left: 14px; right: 14px; bottom: 14px;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: 16px; padding: 12px 14px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    transform: translateY(90px); opacity: 0;
+    transition: transform 320ms cubic-bezier(0.2,0,0,1), opacity 320ms cubic-bezier(0.2,0,0,1);
+    z-index: 40;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast-check {
+    width: 22px; height: 22px; border-radius: 11px; background: rgba(48,209,88,0.16);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--success);
+  }
+  .toast-text { flex: 1; min-width: 0; }
+  .toast-title { font-size: 12.5px; font-weight: 700; color: var(--text-1); }
+  .toast-sub { font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
+  .toast-undo { background: none; border: none; color: var(--carbs); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; flex-shrink: 0; }
+  .toast-progress { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--success); border-radius: 0 0 0 16px; width: 100%; transform-origin: left; }
+  .toast.show .toast-progress { animation: toastShrink 3.6s linear forwards; }
+  @keyframes toastShrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+  /* ── Logic panel ─────────────────────────────────────────────────── */
+  .logic-panel {
+    flex: 1; min-width: 320px; max-width: 560px;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  .logic-card {
+    background: var(--chrome-bg-2); border: 1px solid var(--chrome-border);
+    border-radius: 16px; padding: 20px 22px;
+  }
+  .logic-card h3 {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.01em; margin: 0 0 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .logic-num {
+    width: 20px; height: 20px; border-radius: 6px; background: var(--chrome-accent);
+    color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .logic-card p, .logic-card li { font-size: 13.5px; line-height: 1.6; color: var(--chrome-text-2); margin: 0; }
+  .logic-card ul { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: var(--chrome-border); padding: 1px 6px; border-radius: 5px;
+    color: var(--chrome-text);
+  }
+  .formula {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px;
+    background: var(--chrome-bg); border: 1px solid var(--chrome-border); border-radius: 10px;
+    padding: 12px 14px; margin-top: 10px; overflow-x: auto; color: var(--chrome-text-2); line-height: 1.7;
+  }
+  .formula .hl { color: var(--chrome-accent); font-weight: 600; }
+
+  @media (max-width: 860px) {
+    .layout { justify-content: center; }
+    .phone { width: 340px; height: 710px; }
+  }
+  @media (max-width: 400px) {
+    .phone { width: 300px; height: 630px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="intro">
+    <p class="eyebrow">Мокап · Добавление приёма пищи</p>
+    <h1>Поиск и «Недавние» вместо трёх равнозначных вкладок</h1>
+    <p>
+      Сейчас Свой / База / Скан — три вкладки одного веса, хотя 70–80% логов это повтор
+      того, что уже ели. Ниже интерактивный мокап: тапни по строке в «Недавних» —
+      добавится мгновенно, без дополнительных окон. Переключи время дня, чтобы увидеть,
+      как список переупорядочивается под контекст.
+    </p>
+  </div>
+
+  <div class="layout">
+
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="phone-screen" id="screen">
+          <div class="notch"></div>
+
+          <div class="app-backdrop">
+            <div class="ghost-ring"><span>1&nbsp;850</span></div>
+          </div>
+          <div class="modal-backdrop"></div>
+
+          <div class="sheet">
+            <div class="sheet-handle"><span></span></div>
+
+            <div class="sheet-header">
+              <h2>Добавить приём</h2>
+              <button class="close-btn" aria-label="Закрыть">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            <div class="sheet-body">
+
+              <div class="search-row">
+                <div class="search-box">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input id="searchInput" type="text" placeholder="Название или штрихкод" autocomplete="off" />
+                </div>
+              </div>
+
+              <div class="quick-actions">
+                <button class="pill-btn" id="btnScan">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="2" height="14"/><rect x="7" y="5" width="1" height="14"/><rect x="10" y="5" width="3" height="14"/><rect x="15" y="5" width="1" height="14"/><rect x="17" y="5" width="2" height="14"/><rect x="20" y="5" width="1" height="14"/></svg>
+                  Скан
+                </button>
+                <button class="pill-btn" id="btnCustom">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Свой продукт
+                </button>
+              </div>
+
+              <div class="demo-toggle">
+                <span class="demo-toggle-label">Демо: время&nbsp;дня</span>
+                <div class="demo-seg" id="timeSeg">
+                  <button data-hour="8" class="active">Утро</button>
+                  <button data-hour="14">День</button>
+                  <button data-hour="19">Вечер</button>
+                </div>
+              </div>
+
+              <div class="default-view" id="defaultView">
+                <div>
+                  <p class="section-label" style="margin-bottom:8px;">Недавние</p>
+                  <div class="recent-list" id="recentList"></div>
+                </div>
+
+                <div>
+                  <p class="section-label" style="margin-bottom:8px;">База · всё</p>
+                  <div class="db-list" id="dbList"></div>
+                </div>
+              </div>
+
+              <div class="secondary-panel" id="scanPanel">
+                <button class="back-link" data-back>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Назад
+                </button>
+                <div class="scan-placeholder">
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  <p>Здесь открывается полноэкранная камера — этот флоу не меняется,<br>просто теперь запускается по кнопке, а не по вкладке.</p>
+                </div>
+              </div>
+
+              <div class="secondary-panel" id="customPanel">
+                <button class="back-link" data-back>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Назад
+                </button>
+                <div class="form-preview">
+                  <div class="form-field-mock">Название продукта</div>
+                  <div style="display:flex; gap:8px;">
+                    <div class="form-field-mock" style="flex:1;">Белки</div>
+                    <div class="form-field-mock" style="flex:1;">Жиры</div>
+                    <div class="form-field-mock" style="flex:1;">Углеводы</div>
+                  </div>
+                  <div class="form-field-mock">Граммы</div>
+                  <p style="font-size:12px; color:var(--text-4); padding:2px 2px 0;">Текущая форма ручного ввода — без изменений.</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="toast" id="toast">
+            <div class="toast-check">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="toast-text">
+              <div class="toast-title" id="toastTitle">Добавлено</div>
+              <div class="toast-sub" id="toastSub">Овсянка с бананом · 300 г · 350 ккал</div>
+            </div>
+            <button class="toast-undo" id="toastUndo">Отменить</button>
+            <div class="toast-progress"></div>
+          </div>
+
+        </div>
+      </div>
+      <p class="phone-caption">интерактивно — тапай по строкам</p>
+    </div>
+
+    <div class="logic-panel">
+
+      <div class="logic-card">
+        <h3><span class="logic-num">1</span>Один тап = добавлено</h3>
+        <p>
+          Тап по строке в «Недавних» логирует еду мгновенно на её последней порции —
+          без открытия ещё одного окна. Внизу всплывает тост с отменой на 4 секунды.
+          Это самый частый сценарий (повтор завтрака/обеда), и он должен быть в один жест.
+        </p>
+      </div>
+
+      <div class="logic-card">
+        <h3><span class="logic-num">2</span>Карандаш — если порция другая</h3>
+        <p>
+          Иконка справа на строке разворачивает компактный степпер прямо внутри строки
+          (не новый экран) для случаев «сегодня съел не 300, а 200 грамм».
+        </p>
+      </div>
+
+      <div class="logic-card">
+        <h3><span class="logic-num">3</span>Скан и Свой — не вкладки, а кнопки</h3>
+        <p>
+          Раньше это были три равнозначные вкладки. Но сканить штрихкод или вбивать состав
+          вручную — редкие действия по сравнению с повтором. Понижаем их до компактных
+          кнопок над списком, фокус экрана — на «Недавних» и поиске.
+        </p>
+      </div>
+
+      <div class="logic-card">
+        <h3><span class="logic-num">4</span>Ранжирование «Недавних»</h3>
+        <p>Не просто «последние N записей» — учитывается частота и время суток:</p>
+        <div class="formula">
+<span class="hl">frequency</span>&nbsp;= сколько раз ели за 30 дней<br>
+<span class="hl">timeMatch</span>&nbsp;= 1.5, если ели в это же время суток (±3ч) хоть раз, иначе 1.0<br>
+<span class="hl">recencyBoost</span>&nbsp;= 1.3, если ели в последние 3 дня, иначе 1.0<br>
+<br>
+score = log(1 + frequency) × timeMatch × recencyBoost
+        </div>
+        <p style="margin-top:10px;">
+          Данные уже полностью загружены на клиенте (<code>nutrition.data</code>), новый
+          запрос к серверу не нужен — сортировка чистый JS.
+        </p>
+      </div>
+
+      <div class="logic-card">
+        <h3><span class="logic-num">5</span>Поиск объединяет всё</h3>
+        <p>
+          Начал печатать — «Недавние» и «База» фильтруются вместе одним списком
+          результатов вместо переключения вкладок для поиска по всей базе.
+        </p>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const FOODS = [
+    { name: 'Овсянка с бананом',        emoji: '🥣', grams: 300, kcal: 350, p: 12, f: 8,  c: 55, hours: [7,8,7,8,7,8] },
+    { name: 'Творог 5%',                 emoji: '🥛', grams: 200, kcal: 240, p: 32, f: 10, c: 6,  hours: [8,9,8] },
+    { name: 'Куриная грудка с рисом',    emoji: '🍗', grams: 350, kcal: 520, p: 55, f: 8,  c: 60, hours: [13,14,19,13,20,14] },
+    { name: 'Протеиновый коктейль',      emoji: '🥤', grams: 40,  kcal: 160, p: 28, f: 2,  c: 6,  hours: [17,18,17] },
+    { name: 'Гречка с курицей',          emoji: '🍚', grams: 300, kcal: 430, p: 38, f: 10, c: 45, hours: [19,20,19] },
+    { name: 'Йогурт греческий',          emoji: '🥄', grams: 150, kcal: 130, p: 15, f: 4,  c: 8,  hours: [8,22,9] },
+    { name: 'Салат с тунцом',            emoji: '🥗', grams: 280, kcal: 310, p: 26, f: 15, c: 12, hours: [13,14] },
+  ];
+
+  const DB_EXTRA = [
+    { name: 'Банан', kcal: 89 },
+    { name: 'Яйцо варёное', kcal: 155 },
+    { name: 'Куриная грудка', kcal: 165 },
+    { name: 'Рис отварной', kcal: 130 },
+    { name: 'Миндаль', kcal: 579 },
+  ];
+
+  let currentHour = 8;
+
+  function timeMatches(hours, h) {
+    return hours.some(function (x) {
+      const diff = Math.min(Math.abs(x - h), 24 - Math.abs(x - h));
+      return diff <= 3;
+    });
+  }
+
+  function scoreFood(food, h) {
+    const freq = food.hours.length;
+    const tMatch = timeMatches(food.hours, h) ? 1.5 : 1.0;
+    return Math.log(1 + freq) * tMatch;
+  }
+
+  function renderRecent() {
+    const list = document.getElementById('recentList');
+    const query = document.getElementById('searchInput').value.trim().toLowerCase();
+
+    let items = FOODS.slice();
+    if (query) items = items.filter(function (f) { return f.name.toLowerCase().includes(query); });
+
+    items.sort(function (a, b) { return scoreFood(b, currentHour) - scoreFood(a, currentHour); });
+    if (!query) items = items.slice(0, 6);
+
+    list.innerHTML = '';
+    items.forEach(function (food) {
+      const row = document.createElement('div');
+      row.className = 'recent-row';
+      const matched = timeMatches(food.hours, currentHour);
+      row.innerHTML =
+        '<div class="recent-icon">' + food.emoji + '</div>' +
+        '<div class="recent-main">' +
+          '<div class="recent-name">' + food.name + '</div>' +
+          '<div class="recent-meta">' + food.grams + '&nbsp;г' +
+            (matched ? '<span class="time-badge">обычно сейчас</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="recent-kcal">' + food.kcal + '</div>' +
+        '<button class="edit-btn" data-edit>' +
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+        '</button>' +
+        '<div class="stepper-panel">' +
+          '<button class="step-btn" data-dec>–</button>' +
+          '<span class="step-val">' + food.grams + '&nbsp;г</span>' +
+          '<button class="step-btn" data-inc>+</button>' +
+          '<button class="confirm-btn" data-confirm>Добавить</button>' +
+        '</div>';
+
+      let grams = food.grams;
+      const valEl = row.querySelector('.step-val');
+
+      row.addEventListener('click', function (e) {
+        if (row.classList.contains('editing')) return;
+        if (e.target.closest('[data-edit]')) {
+          row.classList.add('editing');
+          return;
+        }
+        addFood(food.name, grams, Math.round(food.kcal * grams / food.grams), row);
+      });
+
+      row.querySelector('[data-dec]').addEventListener('click', function (e) {
+        e.stopPropagation();
+        grams = Math.max(10, grams - 10);
+        valEl.textContent = grams + ' г';
+      });
+      row.querySelector('[data-inc]').addEventListener('click', function (e) {
+        e.stopPropagation();
+        grams += 10;
+        valEl.textContent = grams + ' г';
+      });
+      row.querySelector('[data-confirm]').addEventListener('click', function (e) {
+        e.stopPropagation();
+        addFood(food.name, grams, Math.round(food.kcal * grams / food.grams), row);
+        row.classList.remove('editing');
+      });
+
+      list.appendChild(row);
+    });
+
+    if (query && items.length === 0) {
+      list.innerHTML = '<p class="empty-hint">Ничего не найдено среди недавних</p>';
+    }
+  }
+
+  function renderDb() {
+    const el = document.getElementById('dbList');
+    const query = document.getElementById('searchInput').value.trim().toLowerCase();
+    let items = DB_EXTRA.slice();
+    if (query) items = items.filter(function (f) { return f.name.toLowerCase().includes(query); });
+
+    el.innerHTML = items.map(function (f) {
+      return '<div class="db-row"><span class="db-row-name">' + f.name + '</span><span class="db-row-kcal">' + f.kcal + ' ккал/100г</span></div>';
+    }).join('') || '<div class="empty-hint">Ничего не найдено</div>';
+  }
+
+  let undoTimer = null;
+  function addFood(name, grams, kcal, rowEl) {
+    if (rowEl) {
+      rowEl.classList.add('added');
+      setTimeout(function () { rowEl.classList.remove('added'); }, 450);
+    }
+    const toast = document.getElementById('toast');
+    document.getElementById('toastTitle').textContent = 'Добавлено';
+    document.getElementById('toastSub').textContent = name + ' · ' + grams + ' г · ' + kcal + ' ккал';
+    toast.classList.remove('show');
+    void toast.offsetWidth;
+    toast.classList.add('show');
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(function () { toast.classList.remove('show'); }, 3800);
+  }
+
+  document.getElementById('toastUndo').addEventListener('click', function () {
+    document.getElementById('toast').classList.remove('show');
+    clearTimeout(undoTimer);
+  });
+
+  document.getElementById('timeSeg').addEventListener('click', function (e) {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll('#timeSeg button').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    currentHour = Number(btn.dataset.hour);
+    renderRecent();
+  });
+
+  document.getElementById('searchInput').addEventListener('input', function () {
+    renderRecent();
+    renderDb();
+  });
+
+  function showPanel(id) {
+    document.getElementById('defaultView').classList.add('hidden');
+    document.querySelectorAll('.secondary-panel').forEach(function (p) { p.classList.remove('visible'); });
+    if (id) document.getElementById(id).classList.add('visible');
+    else document.getElementById('defaultView').classList.remove('hidden');
+  }
+
+  document.getElementById('btnScan').addEventListener('click', function () { showPanel('scanPanel'); });
+  document.getElementById('btnCustom').addEventListener('click', function () { showPanel('customPanel'); });
+  document.querySelectorAll('[data-back]').forEach(function (b) {
+    b.addEventListener('click', function () { showPanel(null); });
+  });
+
+  renderRecent();
+  renderDb();
+})();
+</script>
+</body>
+</html>

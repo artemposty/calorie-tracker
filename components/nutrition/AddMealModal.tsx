@@ -1,21 +1,35 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { FoodEntry, UserFoodItem } from '@/lib/types';
+import { FoodEntry } from '@/lib/types';
 import { calcFromPer100 } from '@/lib/storage';
+import { getRecentFoods } from '@/lib/recentFoods';
 import { haptic } from '@/lib/haptics';
 import { useUserFoods } from '@/hooks/useUserFoods';
 import { fetchProductByBarcode } from '@/lib/openFoodFacts';
 import { BarcodeScanner } from './BarcodeScanner';
 
-type ModalTab = 'custom' | 'db' | 'scan';
-type DbState  = 'list' | 'selected' | 'add-to-db';
-type ScanState = 'idle' | 'scanning' | 'looking-up' | 'found' | 'not-found';
+type View = 'default' | 'scan' | 'custom';
+type ScanState = 'scanning' | 'looking-up' | 'found' | 'not-found';
 
 interface Props {
-  onAdd: (entry: Omit<FoodEntry, 'id' | 'time'>) => void;
+  nutritionData: Record<string, FoodEntry[]>;
+  onAdd: (entry: Omit<FoodEntry, 'id' | 'time'>) => string;
+  onDelete: (id: string) => void;
   onClose: () => void;
+}
+
+interface QuickAddItem {
+  key: string;
+  name: string;
+  kcalPer100: number;
+  pPer100: number;
+  fPer100: number;
+  cPer100: number;
+  grams: number;
+  badge?: string;
+  onDelete?: () => void;
 }
 
 function num(v: string) { return parseFloat(v) || 0; }
@@ -71,39 +85,185 @@ function PrimaryBtn({ onClick, disabled, children }: {
   );
 }
 
-export function AddMealModal({ onAdd, onClose }: Props) {
-  const [tab, setTab] = useState<ModalTab>('custom');
-  const { foods, addFood, deleteFood, findByBarcode } = useUserFoods();
+/** One row shared by "Недавние" and "База" — tap = instant add at its default
+ *  portion, pencil = inline stepper to adjust grams before confirming. */
+function QuickAddRow({ item, onAdd }: { item: QuickAddItem; onAdd: (grams: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [grams, setGrams] = useState(item.grams);
 
+  const displayKcal = Math.round(item.kcalPer100 * item.grams / 100);
+  const editKcal = Math.round(item.kcalPer100 * grams / 100);
+
+  return (
+    <div
+      className="rounded-2xl active:scale-[0.985] transition-transform duration-100"
+      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', padding: '10px 12px', cursor: editing ? 'default' : 'pointer' }}
+      onClick={() => { if (!editing) { onAdd(item.grams); } }}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-[13.5px] font-semibold truncate" style={{ color: 'var(--text-1)' }}>{item.name}</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <p className="text-[11.5px] tabular-nums" style={{ color: 'var(--text-3)' }}>{item.grams} г</p>
+            {item.badge && (
+              <span className="text-[9.5px] font-bold px-1.5 rounded" style={{ background: 'rgba(48,209,88,0.14)', color: 'var(--success)' }}>
+                {item.badge}
+              </span>
+            )}
+          </div>
+        </div>
+        <p className="text-[13px] font-bold tabular-nums shrink-0" style={{ color: 'var(--text-2)' }}>{displayKcal}</p>
+        {item.onDelete && (
+          <button
+            onClick={e => { e.stopPropagation(); haptic('medium'); item.onDelete!(); }}
+            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-4)' }}
+          >
+            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+              <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" />
+            </svg>
+          </button>
+        )}
+        <button
+          onClick={e => { e.stopPropagation(); haptic('light'); setGrams(item.grams); setEditing(v => !v); }}
+          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+          style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-3)' }}
+        >
+          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+        </button>
+      </div>
+
+      {editing && (
+        <div
+          className="flex items-center justify-between gap-2 mt-2.5 pt-2.5"
+          style={{ borderTop: '1px solid var(--border-sub)' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <button onClick={() => setGrams(g => Math.max(10, g - 10))}
+            className="w-8 h-8 rounded-lg text-base font-semibold active:scale-90 transition-transform"
+            style={{ background: 'var(--bg-card)', color: 'var(--text-1)' }}>–</button>
+          <span className="text-sm font-bold tabular-nums flex-1 text-center" style={{ color: 'var(--text-1)' }}>
+            {grams} г · {editKcal} ккал
+          </span>
+          <button onClick={() => setGrams(g => g + 10)}
+            className="w-8 h-8 rounded-lg text-base font-semibold active:scale-90 transition-transform"
+            style={{ background: 'var(--bg-card)', color: 'var(--text-1)' }}>+</button>
+          <button
+            onClick={() => { onAdd(grams); setEditing(false); }}
+            className="px-3.5 py-2 rounded-lg text-xs font-bold active:scale-95 transition-transform"
+            style={{ background: '#ffffff', color: '#0a0a0b' }}
+          >
+            Добавить
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AddMealModal({ nutritionData, onAdd, onDelete, onClose }: Props) {
+  const { foods, addFood, deleteFood, findByBarcode } = useUserFoods();
+  const [view, setView] = useState<View>('default');
+  const [search, setSearch] = useState('');
+  const [now] = useState(() => new Date());
+
+  // ── Toast (undo) — portaled above everything, including the full-screen scanner ──
+  const [toast, setToast] = useState<{ id: string; label: string } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const commitAdd = useCallback((entry: Omit<FoodEntry, 'id' | 'time'>) => {
+    const id = onAdd(entry);
+    haptic('success');
+    setToast({ id, label: `${entry.name} · ${entry.grams} г · ${entry.kcal} ккал` });
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3800);
+  }, [onAdd]);
+
+  function undoToast() {
+    if (!toast) return;
+    onDelete(toast.id);
+    setToast(null);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    haptic('light');
+  }
+
+  // ── Недавние (ranked, whole history pool so search can find deep matches) ──
+  const allRecent = useMemo(() => getRecentFoods(nutritionData, now, 50), [nutritionData, now]);
+  const query = search.trim().toLowerCase();
+  const recentToShow = query
+    ? allRecent.filter(r => r.name.toLowerCase().includes(query))
+    : allRecent.slice(0, 6);
+
+  const dbToShow = useMemo(
+    () => query ? foods.filter(f => f.name.toLowerCase().includes(query)) : foods,
+    [foods, query]
+  );
+
+  function handleQuickAdd(item: { name: string; kcalPer100: number; pPer100: number; fPer100: number; cPer100: number }, grams: number) {
+    commitAdd({
+      name: item.name, grams,
+      kcal: Math.round(item.kcalPer100 * grams / 100),
+      p: calcFromPer100(item.pPer100, grams),
+      f: calcFromPer100(item.fPer100, grams),
+      c: calcFromPer100(item.cPer100, grams),
+    });
+  }
+
+  // ── Custom entry ─────────────────────────────────────────────────────
   const [cName, setCName] = useState('');
   const [cP, setCP] = useState('');
   const [cF, setCF] = useState('');
   const [cC, setCC] = useState('');
   const [cGrams, setCGrams] = useState('100');
+  const [cSaveToDb, setCSaveToDb] = useState(false);
 
-  const [dbState, setDbState]   = useState<DbState>('list');
-  const [dbSearch, setDbSearch] = useState('');
-  const [dbSelected, setDbSelected] = useState<UserFoodItem | null>(null);
-  const [dbGrams, setDbGrams]   = useState('100');
-  const [addName, setAddName]       = useState('');
-  const [addP, setAddP]             = useState('');
-  const [addF, setAddF]             = useState('');
-  const [addC, setAddC]             = useState('');
-  const [addDefaultGrams, setAddDefaultGrams] = useState('');
+  const cGramsNum    = num(cGrams);
+  const kcalPer100   = macrosToKcal(cP, cF, cC);
+  const customPreview = cGramsNum > 0 && kcalPer100 > 0 ? {
+    kcal: Math.round(kcalPer100 * cGramsNum / 100),
+    p: calcFromPer100(num(cP), cGramsNum),
+    f: calcFromPer100(num(cF), cGramsNum),
+    c: calcFromPer100(num(cC), cGramsNum),
+  } : null;
 
-  // ── Scan tab ─────────────────────────────────────────────────────────
-  // cameraStarted stays true across multiple scans in one session so the
-  // underlying MediaStream is never released and re-requested — avoids
-  // repeat permission prompts. scanState only controls what's *shown*.
+  function handleAddCustom() {
+    if (!cName.trim() || cGramsNum <= 0) return;
+    commitAdd({
+      name: cName.trim(), grams: cGramsNum,
+      kcal: Math.round(kcalPer100 * cGramsNum / 100),
+      p: calcFromPer100(num(cP), cGramsNum),
+      f: calcFromPer100(num(cF), cGramsNum),
+      c: calcFromPer100(num(cC), cGramsNum),
+    });
+    if (cSaveToDb) {
+      addFood({ name: cName.trim(), kcal: kcalPer100, p: num(cP), f: num(cF), c: num(cC), defaultGrams: cGramsNum });
+    }
+    setCName(''); setCP(''); setCF(''); setCC(''); setCGrams('100'); setCSaveToDb(false);
+  }
+
+  // ── Scan ─────────────────────────────────────────────────────────────
+  // cameraStarted stays true across the whole modal session so the underlying
+  // MediaStream is never released and re-requested — avoids repeat permission
+  // prompts. The scanner is paused (hidden, decode ignored) whenever we're not
+  // actively on the scan view, without tearing the stream down.
   const [cameraStarted, setCameraStarted] = useState(false);
-  const [scanState, setScanState]     = useState<ScanState>('idle');
+  const [scanState, setScanState] = useState<ScanState>('scanning');
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
-  const [scanSource, setScanSource]   = useState<'cache' | 'off' | null>(null);
+  const [scanSource, setScanSource] = useState<'cache' | 'off' | null>(null);
   const [sName, setSName] = useState('');
   const [sP, setSP] = useState('');
   const [sF, setSF] = useState('');
   const [sC, setSC] = useState('');
   const [sGrams, setSGrams] = useState('100');
+
+  function openScan() {
+    setView('scan');
+    setCameraStarted(true);
+    setScanState('scanning');
+  }
 
   const handleDetected = useCallback(async (barcode: string) => {
     setScanState('looking-up');
@@ -139,10 +299,11 @@ export function AddMealModal({ onAdd, onClose }: Props) {
     setSName(''); setSP(''); setSF(''); setSC(''); setSGrams('100');
   }
 
-  /** Fully closes the camera and returns to the start screen. */
-  function closeScanner() {
+  /** Fully releases the camera (its own X button) and returns to search. */
+  function closeScannerFully() {
     setCameraStarted(false);
-    setScanState('idle');
+    setView('default');
+    setScanState('scanning');
     setScannedBarcode(null);
     setScanSource(null);
     setSName(''); setSP(''); setSF(''); setSC(''); setSGrams('100');
@@ -159,91 +320,21 @@ export function AddMealModal({ onAdd, onClose }: Props) {
 
   function handleAddFromScan() {
     if (!sName.trim() || sGramsNum <= 0) return;
-    haptic('success');
-    onAdd({
+    commitAdd({
       name: sName.trim(), grams: sGramsNum,
       kcal: Math.round(sKcalPer100 * sGramsNum / 100),
       p: calcFromPer100(num(sP), sGramsNum),
       f: calcFromPer100(num(sF), sGramsNum),
       c: calcFromPer100(num(sC), sGramsNum),
     });
-    // Cache newly-scanned products locally so the next scan is instant
     if (scanSource === 'off' && scannedBarcode) {
       addFood({
         name: sName.trim(), kcal: sKcalPer100, p: num(sP), f: num(sF), c: num(sC),
         barcode: scannedBarcode, defaultGrams: sGramsNum,
       });
     }
-    onClose();
+    rescan(); // ready for the next item — ideal for scanning a whole shopping haul
   }
-
-  const filteredFoods = useMemo(
-    () => foods.filter(f => f.name.toLowerCase().includes(dbSearch.toLowerCase())),
-    [foods, dbSearch]
-  );
-
-  const cGramsNum    = num(cGrams);
-  const kcalPer100   = macrosToKcal(cP, cF, cC);
-  const customPreview = cGramsNum > 0 && kcalPer100 > 0 ? {
-    kcal: Math.round(kcalPer100 * cGramsNum / 100),
-    p: calcFromPer100(num(cP), cGramsNum),
-    f: calcFromPer100(num(cF), cGramsNum),
-    c: calcFromPer100(num(cC), cGramsNum),
-  } : null;
-
-  const dbGramsNum = num(dbGrams);
-  const dbPreview  = dbSelected && dbGramsNum > 0 ? {
-    kcal: Math.round(dbSelected.kcal * dbGramsNum / 100),
-    p: calcFromPer100(dbSelected.p, dbGramsNum),
-    f: calcFromPer100(dbSelected.f, dbGramsNum),
-    c: calcFromPer100(dbSelected.c, dbGramsNum),
-  } : null;
-
-  const addKcal = macrosToKcal(addP, addF, addC);
-
-  function handleAddCustom() {
-    if (!cName.trim() || cGramsNum <= 0) return;
-    haptic('success');
-    onAdd({
-      name: cName.trim(), grams: cGramsNum,
-      kcal: Math.round(kcalPer100 * cGramsNum / 100),
-      p: calcFromPer100(num(cP), cGramsNum),
-      f: calcFromPer100(num(cF), cGramsNum),
-      c: calcFromPer100(num(cC), cGramsNum),
-    });
-    onClose();
-  }
-
-  function handleAddFromDb() {
-    if (!dbSelected || dbGramsNum <= 0) return;
-    haptic('success');
-    onAdd({
-      name: dbSelected.name, grams: dbGramsNum,
-      kcal: Math.round(dbSelected.kcal * dbGramsNum / 100),
-      p: calcFromPer100(dbSelected.p, dbGramsNum),
-      f: calcFromPer100(dbSelected.f, dbGramsNum),
-      c: calcFromPer100(dbSelected.c, dbGramsNum),
-    });
-    onClose();
-  }
-
-  function handleSaveToDb() {
-    if (!addName.trim()) return;
-    haptic('medium');
-    const dg = num(addDefaultGrams);
-    addFood({
-      name: addName.trim(), kcal: addKcal, p: num(addP), f: num(addF), c: num(addC),
-      ...(dg > 0 ? { defaultGrams: dg } : {}),
-    });
-    setAddName(''); setAddP(''); setAddF(''); setAddC(''); setAddDefaultGrams('');
-    setDbState('list');
-  }
-
-  const TABS: { id: ModalTab; label: string }[] = [
-    { id: 'custom', label: 'Свой' },
-    { id: 'db', label: 'База' },
-    { id: 'scan', label: 'Скан' },
-  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
@@ -279,28 +370,100 @@ export function AddMealModal({ onAdd, onClose }: Props) {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1.5 px-5 mb-4 shrink-0">
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => { haptic('light'); setTab(t.id); }}
-              className="flex-1 py-2 text-sm font-semibold rounded-xl transition-colors"
-              style={{
-                background: tab === t.id ? '#ffffff' : 'var(--bg-elevated)',
-                color: tab === t.id ? '#0a0a0b' : 'var(--text-3)',
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
         <div className="flex-1 overflow-y-auto">
 
-          {/* CUSTOM TAB */}
-          {tab === 'custom' && (
+          {/* ── DEFAULT VIEW: search + Недавние + База ─────────────────── */}
+          {view === 'default' && (
+            <div className="px-5 pb-5 flex flex-col gap-4">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <svg width="15" height="15" fill="none" stroke="var(--text-3)" strokeWidth="2" viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    type="text" placeholder="Название или штрихкод" value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-white/20"
+                    style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={() => { haptic('light'); openScan(); }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold active:scale-95 transition-transform"
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-2)' }}>
+                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                    <rect x="3" y="5" width="2" height="14" /><rect x="7" y="5" width="1" height="14" />
+                    <rect x="10" y="5" width="3" height="14" /><rect x="15" y="5" width="1" height="14" />
+                    <rect x="17" y="5" width="2" height="14" /><rect x="20" y="5" width="1" height="14" />
+                  </svg>
+                  Скан
+                </button>
+                <button onClick={() => { haptic('light'); setView('custom'); }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold active:scale-95 transition-transform"
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-2)' }}>
+                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" viewBox="0 0 24 24">
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  Свой продукт
+                </button>
+              </div>
+
+              {recentToShow.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-4)' }}>Недавние</p>
+                  <div className="flex flex-col gap-1.5">
+                    {recentToShow.map(r => (
+                      <QuickAddRow
+                        key={r.name}
+                        item={{
+                          key: r.name, name: r.name, grams: r.grams,
+                          kcalPer100: r.grams > 0 ? r.kcal / r.grams * 100 : 0,
+                          pPer100:    r.grams > 0 ? r.p / r.grams * 100    : 0,
+                          fPer100:    r.grams > 0 ? r.f / r.grams * 100    : 0,
+                          cPer100:    r.grams > 0 ? r.c / r.grams * 100    : 0,
+                          badge: r.timeMatch ? 'обычно сейчас' : undefined,
+                        }}
+                        onAdd={grams => handleQuickAdd({ name: r.name, kcalPer100: r.grams > 0 ? r.kcal / r.grams * 100 : 0, pPer100: r.grams > 0 ? r.p / r.grams * 100 : 0, fPer100: r.grams > 0 ? r.f / r.grams * 100 : 0, cPer100: r.grams > 0 ? r.c / r.grams * 100 : 0 }, grams)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-4)' }}>База</p>
+                {dbToShow.length === 0 ? (
+                  <p className="text-sm text-center py-6" style={{ color: 'var(--text-4)' }}>
+                    {foods.length === 0 ? 'Пока пусто — сохраняй продукты через «Свой продукт»' : 'Ничего не найдено'}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    {dbToShow.map(f => (
+                      <QuickAddRow
+                        key={f.id}
+                        item={{
+                          key: f.id, name: f.name, grams: f.defaultGrams ?? 100,
+                          kcalPer100: f.kcal, pPer100: f.p, fPer100: f.f, cPer100: f.c,
+                          onDelete: () => { deleteFood(f.id); },
+                        }}
+                        onAdd={grams => handleQuickAdd({ name: f.name, kcalPer100: f.kcal, pPer100: f.p, fPer100: f.f, cPer100: f.c }, grams)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── CUSTOM VIEW ──────────────────────────────────────────────── */}
+          {view === 'custom' && (
             <div className="px-5 pb-5 flex flex-col gap-3">
+              <button onClick={() => { haptic('light'); setView('default'); }} className="flex items-center gap-1 text-sm self-start" style={{ color: 'var(--text-3)' }}>
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" /></svg>
+                Назад
+              </button>
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-3)' }}>Название</label>
                 <DarkInput type="text" value={cName} onChange={e => setCName(e.target.value)} placeholder="Например: Борщ домашний" />
@@ -324,177 +487,25 @@ export function AddMealModal({ onAdd, onClose }: Props) {
                 <DarkInput type="number" inputMode="decimal" value={cGrams} onChange={e => setCGrams(e.target.value)} />
               </div>
               {customPreview && <PreviewRow {...customPreview} />}
+              <label className="flex items-center gap-2.5 py-1 cursor-pointer">
+                <input type="checkbox" checked={cSaveToDb} onChange={e => setCSaveToDb(e.target.checked)}
+                  className="w-4 h-4 rounded" style={{ accentColor: '#ffffff' }} />
+                <span className="text-xs" style={{ color: 'var(--text-3)' }}>Сохранить в Базу для быстрого повторного добавления</span>
+              </label>
               <PrimaryBtn onClick={handleAddCustom} disabled={!cName.trim() || cGramsNum <= 0}>
                 Добавить
               </PrimaryBtn>
             </div>
           )}
 
-          {/* DB TAB */}
-          {tab === 'db' && (
-            <div className="flex flex-col">
-
-              {dbState === 'list' && (
-                <>
-                  <div className="px-5 pb-3 shrink-0 flex gap-2">
-                    <div className="relative flex-1">
-                      <svg width="16" height="16" fill="none" stroke="var(--text-3)" strokeWidth="2" viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                      </svg>
-                      <input
-                        type="text" placeholder="Поиск…" value={dbSearch}
-                        onChange={e => setDbSearch(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-white/20"
-                        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
-                      />
-                    </div>
-                    <button
-                      onClick={() => { haptic('light'); setDbState('add-to-db'); }}
-                      className="w-10 flex items-center justify-center rounded-xl active:scale-90 transition-transform"
-                      style={{ background: '#ffffff' }}
-                    >
-                      <svg width="18" height="18" fill="none" stroke="#0a0a0b" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <line x1="12" y1="5" x2="12" y2="19" strokeLinecap="round" />
-                        <line x1="5" y1="12" x2="19" y2="12" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  <div className="px-5 pb-5">
-                    {filteredFoods.length === 0 ? (
-                      <div className="text-center py-10">
-                        <p className="text-sm mb-3" style={{ color: 'var(--text-4)' }}>
-                          {foods.length === 0 ? 'База пустая' : 'Ничего не найдено'}
-                        </p>
-                        {foods.length === 0 && (
-                          <button onClick={() => setDbState('add-to-db')} className="text-sm font-semibold underline" style={{ color: 'var(--text-2)' }}>
-                            Добавить первое блюдо
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
-                        {filteredFoods.map((food, i) => (
-                          <div key={food.id}>
-                            <div className="flex items-center">
-                              <button
-                                onClick={() => { haptic('light'); setDbSelected(food); setDbGrams(String(food.defaultGrams ?? 100)); setDbState('selected'); }}
-                                className="flex-1 flex items-center justify-between px-4 py-3.5 text-left active:opacity-70 transition-opacity"
-                              >
-                                <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>{food.name}</span>
-                                <span className="text-xs shrink-0 ml-2" style={{ color: 'var(--text-3)' }}>{food.kcal} ккал/100г</span>
-                              </button>
-                              <button
-                                onClick={() => { haptic('medium'); deleteFood(food.id); }}
-                                className="p-3 active:scale-90 transition-transform"
-                                style={{ color: 'var(--text-4)' }}
-                              >
-                                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-                                  <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
-                                </svg>
-                              </button>
-                            </div>
-                            {i < filteredFoods.length - 1 && <div style={{ height: 1, background: 'var(--border-sub)', marginLeft: 16 }} />}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {dbState === 'selected' && dbSelected && (
-                <div className="px-5 pb-5 flex flex-col gap-4">
-                  <button onClick={() => setDbState('list')} className="flex items-center gap-1 text-sm" style={{ color: 'var(--text-3)' }}>
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-                    Назад
-                  </button>
-                  <div className="rounded-xl p-4" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
-                    <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-1)' }}>{dbSelected.name}</p>
-                    <p className="text-xs" style={{ color: 'var(--text-3)' }}>
-                      на 100 г: {dbSelected.kcal} ккал · Б {dbSelected.p} · Ж {dbSelected.f} · У {dbSelected.c}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-3)' }}>Граммы</label>
-                    <DarkInput type="number" inputMode="decimal" value={dbGrams} onChange={e => setDbGrams(e.target.value)} />
-                  </div>
-                  {dbPreview && <PreviewRow {...dbPreview} />}
-                  <PrimaryBtn onClick={handleAddFromDb} disabled={dbGramsNum <= 0}>Добавить</PrimaryBtn>
-                </div>
-              )}
-
-              {dbState === 'add-to-db' && (
-                <div className="px-5 pb-5 flex flex-col gap-3">
-                  <button onClick={() => setDbState('list')} className="flex items-center gap-1 text-sm" style={{ color: 'var(--text-3)' }}>
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-                    Назад
-                  </button>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-3)' }}>Название</label>
-                    <DarkInput type="text" value={addName} onChange={e => setAddName(e.target.value)} placeholder="Куриная грудка" />
-                  </div>
-                  <p className="text-xs" style={{ color: 'var(--text-3)' }}>БЖУ на 100 г:</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[{ label: 'Белки', value: addP, set: setAddP }, { label: 'Жиры', value: addF, set: setAddF }, { label: 'Углеводы', value: addC, set: setAddC }].map(({ label, value, set }) => (
-                      <div key={label}>
-                        <label className="text-xs block mb-1.5" style={{ color: 'var(--text-3)' }}>{label}</label>
-                        <DarkInput type="number" inputMode="decimal" value={value} onChange={e => set(e.target.value)} placeholder="0" />
-                      </div>
-                    ))}
-                  </div>
-                  {addKcal > 0 && (
-                    <p className="text-xs" style={{ color: 'var(--text-3)' }}>
-                      ≈ <span className="font-bold" style={{ color: 'var(--kcal)' }}>{addKcal}</span> ккал / 100 г
-                    </p>
-                  )}
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-3)' }}>
-                      Граммы по умолчанию <span style={{ color: 'var(--text-4)', fontWeight: 400, textTransform: 'none' }}>(необязательно)</span>
-                    </label>
-                    <DarkInput type="number" inputMode="decimal" value={addDefaultGrams} onChange={e => setAddDefaultGrams(e.target.value)} placeholder="100" />
-                  </div>
-                  <PrimaryBtn onClick={handleSaveToDb} disabled={!addName.trim()}>Сохранить в базу</PrimaryBtn>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* SCAN TAB */}
-          {tab === 'scan' && (
+          {/* ── SCAN VIEW ────────────────────────────────────────────────── */}
+          {view === 'scan' && (
             <div className="px-5 pb-5 flex flex-col gap-4">
-              {scanState === 'idle' && (
-                <div className="flex flex-col items-center gap-4 py-10">
-                  <div
-                    className="w-16 h-16 rounded-full flex items-center justify-center"
-                    style={{ background: 'var(--bg-elevated)' }}
-                  >
-                    <svg width="28" height="28" fill="none" stroke="var(--text-2)" strokeWidth="1.8" viewBox="0 0 24 24">
-                      <rect x="3" y="5" width="2" height="14" /><rect x="7" y="5" width="1" height="14" />
-                      <rect x="10" y="5" width="3" height="14" /><rect x="15" y="5" width="1" height="14" />
-                      <rect x="17" y="5" width="2" height="14" /><rect x="20" y="5" width="1" height="14" />
-                    </svg>
-                  </div>
-                  <p className="text-sm text-center" style={{ color: 'var(--text-3)' }}>
-                    Отсканируй штрихкод с упаковки —{' '}БЖУ подтянутся автоматически
-                  </p>
-                  <PrimaryBtn onClick={() => { setCameraStarted(true); setScanState('scanning'); }}>Сканировать штрихкод</PrimaryBtn>
-                </div>
-              )}
-
-              {/* Mounted for the whole camera session — hidden (not unmounted) whenever
-                  scanState isn't 'scanning', so the MediaStream stays alive between scans.
-                  Rendered via portal: the modal sheet's slide-up animation leaves an active
-                  `transform` on its container (fill-mode: both), which would otherwise make
-                  it the containing block for this fixed-position overlay instead of the
-                  viewport — shrinking it down to the sheet's own box. */}
-              {cameraStarted && typeof document !== 'undefined' && createPortal(
-                <BarcodeScanner
-                  paused={scanState !== 'scanning'}
-                  onDetected={handleDetected}
-                  onClose={closeScanner}
-                />,
-                document.body,
+              {scanState !== 'scanning' && (
+                <button onClick={() => { haptic('light'); setView('default'); }} className="flex items-center gap-1 text-sm self-start" style={{ color: 'var(--text-3)' }}>
+                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" /></svg>
+                  Назад
+                </button>
               )}
 
               {scanState === 'looking-up' && (
@@ -508,7 +519,7 @@ export function AddMealModal({ onAdd, onClose }: Props) {
                 <div className="flex flex-col items-center gap-4 py-10 text-center">
                   <p className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>Продукт не найден</p>
                   <p className="text-xs" style={{ color: 'var(--text-3)' }}>
-                    Штрихкод {scannedBarcode} нет в базе Open Food Facts. Добавь БЖУ вручную во вкладке «Свой».
+                    Штрихкод {scannedBarcode} нет в базе Open Food Facts. Добавь БЖУ вручную.
                   </p>
                   <div className="flex gap-2 w-full">
                     <button
@@ -519,7 +530,7 @@ export function AddMealModal({ onAdd, onClose }: Props) {
                       Сканировать снова
                     </button>
                     <button
-                      onClick={() => { haptic('light'); setCName(''); setTab('custom'); }}
+                      onClick={() => { haptic('light'); setCName(''); setView('custom'); }}
                       className="flex-1 py-3 rounded-xl text-sm font-semibold"
                       style={{ background: '#ffffff', color: '#0a0a0b' }}
                     >
@@ -577,6 +588,49 @@ export function AddMealModal({ onAdd, onClose }: Props) {
           )}
         </div>
       </div>
+
+      {/* Camera — portal to escape the sheet's transformed containing block.
+          Mounted for the whole session; paused (hidden, decode ignored) whenever
+          we're not actively on the scan view, so the stream is never released
+          and re-requested mid-session (avoids repeat permission prompts). */}
+      {cameraStarted && typeof document !== 'undefined' && createPortal(
+        <BarcodeScanner
+          paused={!(view === 'scan' && scanState === 'scanning')}
+          onDetected={handleDetected}
+          onClose={closeScannerFully}
+        />,
+        document.body,
+      )}
+
+      {/* Undo toast — portaled above the camera overlay too */}
+      {typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed left-4 right-4 z-[70] flex items-center gap-2.5 rounded-2xl px-3.5 py-3"
+          style={{
+            bottom: 'max(env(safe-area-inset-bottom), 16px)',
+            background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.45)',
+            transform: toast ? 'translateY(0)' : 'translateY(90px)',
+            opacity: toast ? 1 : 0,
+            transition: 'transform 320ms cubic-bezier(0.2,0,0,1), opacity 320ms cubic-bezier(0.2,0,0,1)',
+            pointerEvents: toast ? 'auto' : 'none',
+          }}
+        >
+          <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(48,209,88,0.16)', color: 'var(--success)' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold" style={{ color: 'var(--text-1)' }}>Добавлено</p>
+            <p className="text-[11px] truncate" style={{ color: 'var(--text-3)' }}>{toast?.label ?? ''}</p>
+          </div>
+          <button onClick={undoToast} className="text-xs font-bold shrink-0" style={{ color: 'var(--carbs)' }}>
+            Отменить
+          </button>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
