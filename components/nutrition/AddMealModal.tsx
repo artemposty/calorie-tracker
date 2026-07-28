@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { FoodEntry, UserFoodItem } from '@/lib/types';
 import { calcFromPer100 } from '@/lib/storage';
 import { haptic } from '@/lib/haptics';
@@ -482,13 +483,18 @@ export function AddMealModal({ onAdd, onClose }: Props) {
               )}
 
               {/* Mounted for the whole camera session — hidden (not unmounted) whenever
-                  scanState isn't 'scanning', so the MediaStream stays alive between scans. */}
-              {cameraStarted && (
+                  scanState isn't 'scanning', so the MediaStream stays alive between scans.
+                  Rendered via portal: the modal sheet's slide-up animation leaves an active
+                  `transform` on its container (fill-mode: both), which would otherwise make
+                  it the containing block for this fixed-position overlay instead of the
+                  viewport — shrinking it down to the sheet's own box. */}
+              {cameraStarted && typeof document !== 'undefined' && createPortal(
                 <BarcodeScanner
                   paused={scanState !== 'scanning'}
                   onDetected={handleDetected}
                   onClose={closeScanner}
-                />
+                />,
+                document.body,
               )}
 
               {scanState === 'looking-up' && (
