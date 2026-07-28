@@ -91,6 +91,10 @@ export function AddMealModal({ onAdd, onClose }: Props) {
   const [addDefaultGrams, setAddDefaultGrams] = useState('');
 
   // ── Scan tab ─────────────────────────────────────────────────────────
+  // cameraStarted stays true across multiple scans in one session so the
+  // underlying MediaStream is never released and re-requested — avoids
+  // repeat permission prompts. scanState only controls what's *shown*.
+  const [cameraStarted, setCameraStarted] = useState(false);
   const [scanState, setScanState]     = useState<ScanState>('idle');
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
   const [scanSource, setScanSource]   = useState<'cache' | 'off' | null>(null);
@@ -118,7 +122,7 @@ export function AddMealModal({ onAdd, onClose }: Props) {
     if (product) {
       setSName(product.name);
       setSP(String(product.p)); setSF(String(product.f)); setSC(String(product.c));
-      setSGrams('100');
+      setSGrams(product.grams ? String(product.grams) : '100');
       setScanSource('off');
       setScanState('found');
     } else {
@@ -126,7 +130,17 @@ export function AddMealModal({ onAdd, onClose }: Props) {
     }
   }, [findByBarcode]);
 
-  function resetScan() {
+  /** Rescan within the same session — camera stream stays alive. */
+  function rescan() {
+    setScanState('scanning');
+    setScannedBarcode(null);
+    setScanSource(null);
+    setSName(''); setSP(''); setSF(''); setSC(''); setSGrams('100');
+  }
+
+  /** Fully closes the camera and returns to the start screen. */
+  function closeScanner() {
+    setCameraStarted(false);
     setScanState('idle');
     setScannedBarcode(null);
     setScanSource(null);
@@ -156,7 +170,7 @@ export function AddMealModal({ onAdd, onClose }: Props) {
     if (scanSource === 'off' && scannedBarcode) {
       addFood({
         name: sName.trim(), kcal: sKcalPer100, p: num(sP), f: num(sF), c: num(sC),
-        barcode: scannedBarcode,
+        barcode: scannedBarcode, defaultGrams: sGramsNum,
       });
     }
     onClose();
@@ -463,12 +477,18 @@ export function AddMealModal({ onAdd, onClose }: Props) {
                   <p className="text-sm text-center" style={{ color: 'var(--text-3)' }}>
                     Отсканируй штрихкод с упаковки —{' '}БЖУ подтянутся автоматически
                   </p>
-                  <PrimaryBtn onClick={() => setScanState('scanning')}>Сканировать штрихкод</PrimaryBtn>
+                  <PrimaryBtn onClick={() => { setCameraStarted(true); setScanState('scanning'); }}>Сканировать штрихкод</PrimaryBtn>
                 </div>
               )}
 
-              {scanState === 'scanning' && (
-                <BarcodeScanner onDetected={handleDetected} onClose={() => setScanState('idle')} />
+              {/* Mounted for the whole camera session — hidden (not unmounted) whenever
+                  scanState isn't 'scanning', so the MediaStream stays alive between scans. */}
+              {cameraStarted && (
+                <BarcodeScanner
+                  paused={scanState !== 'scanning'}
+                  onDetected={handleDetected}
+                  onClose={closeScanner}
+                />
               )}
 
               {scanState === 'looking-up' && (
@@ -486,7 +506,7 @@ export function AddMealModal({ onAdd, onClose }: Props) {
                   </p>
                   <div className="flex gap-2 w-full">
                     <button
-                      onClick={() => { haptic('light'); resetScan(); }}
+                      onClick={() => { haptic('light'); rescan(); }}
                       className="flex-1 py-3 rounded-xl text-sm font-semibold"
                       style={{ background: 'var(--bg-elevated)', color: 'var(--text-2)' }}
                     >
@@ -515,7 +535,7 @@ export function AddMealModal({ onAdd, onClose }: Props) {
                     >
                       {scanSource === 'cache' ? '✓ Уже сканировал' : '✓ Open Food Facts'}
                     </span>
-                    <button onClick={() => { haptic('light'); resetScan(); }} className="text-xs font-medium" style={{ color: 'var(--text-3)' }}>
+                    <button onClick={() => { haptic('light'); rescan(); }} className="text-xs font-medium" style={{ color: 'var(--text-3)' }}>
                       Сканировать другой
                     </button>
                   </div>

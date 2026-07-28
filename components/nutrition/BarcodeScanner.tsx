@@ -6,6 +6,10 @@ import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { haptic } from '@/lib/haptics';
 
 interface Props {
+  /** When true, decode results are ignored and the UI is hidden — but the
+   *  camera stream stays alive so resuming doesn't re-trigger a permission
+   *  prompt or a fresh getUserMedia handshake. */
+  paused: boolean;
   onDetected: (barcode: string) => void;
   onClose: () => void;
 }
@@ -13,12 +17,17 @@ interface Props {
 type ScanState = 'starting' | 'scanning' | 'denied' | 'no-camera' | 'error';
 type FocusRing = { x: number; y: number; key: number };
 
-export function BarcodeScanner({ onDetected, onClose }: Props) {
+export function BarcodeScanner({ paused, onDetected, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
+  const pausedRef = useRef(paused);
   const [state, setState] = useState<ScanState>('starting');
   const [focusRing, setFocusRing] = useState<FocusRing | null>(null);
 
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
+
+  // Camera is requested exactly once per mount — resuming after a scan
+  // reuses the same live stream instead of calling getUserMedia again.
   useEffect(() => {
     let cancelled = false;
 
@@ -27,8 +36,6 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
       BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
       BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
     ]);
-    // Scan much more frequently than the 500ms default — barcodes decode
-    // faster when we don't wait between attempts.
     const reader = new BrowserMultiFormatReader(hints, {
       delayBetweenScanAttempts: 60,
       delayBetweenScanSuccess: 200,
@@ -40,7 +47,6 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
           {
             video: {
               facingMode: 'environment',
-              // Higher resolution = smaller/farther barcodes stay readable
               width: { ideal: 1920 },
               height: { ideal: 1080 },
               advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet],
@@ -48,10 +54,12 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
           },
           videoRef.current!,
           (result) => {
-            if (result && !cancelled) {
+            if (result && !cancelled && !pausedRef.current) {
+              // Block immediately (synchronously) so a burst of frames
+              // right after the hit can't double-fire before the parent's
+              // `paused` prop change propagates back down.
+              pausedRef.current = true;
               haptic('success');
-              cancelled = true;
-              controlsRef.current?.stop();
               onDetected(result.getText());
             }
           },
@@ -81,9 +89,6 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
     setFocusRing({ x, y, key: Date.now() });
     haptic('light');
 
-    // Best-effort manual focus — support varies a lot by browser/device,
-    // so this silently no-ops where unsupported. The visual ring above
-    // always gives feedback regardless.
     const track = (videoRef.current?.srcObject as MediaStream | null)?.getVideoTracks?.()[0];
     if (!track?.getCapabilities) return;
     try {
@@ -95,7 +100,6 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
       } else if (caps.pointsOfInterest && caps.focusMode?.includes('manual')) {
         await track.applyConstraints({ advanced: [{ pointsOfInterest: [{ x: nx, y: ny }] } as unknown as MediaTrackConstraintSet] });
       } else if (caps.focusMode?.includes('continuous')) {
-        // Toggle off/on to force a fresh autofocus pass
         await track.applyConstraints({ advanced: [{ focusMode: 'manual' } as MediaTrackConstraintSet] });
         await track.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] });
       }
@@ -105,7 +109,7 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50" style={{ background: '#000' }}>
+    <div className="fixed inset-0 z-[60]" style={{ background: '#000', display: paused ? 'none' : 'block' }}>
       <div className="absolute inset-0" onClick={handleTapFocus}>
         <video
           ref={videoRef}
@@ -131,11 +135,11 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
         />
       )}
 
-      {/* Dark overlay with cutout frame — ~45% of viewport height */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-6">
+      {/* Dark overlay with cutout frame — half the visible viewport height */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-5">
         <div
           style={{
-            width: '100%', maxWidth: 380, height: '45vh', maxHeight: 420,
+            width: '100%', maxWidth: 420, height: '50dvh',
             borderRadius: 20,
             boxShadow: '0 0 0 2000px rgba(0,0,0,0.55)',
             border: '2px solid rgba(255,255,255,0.6)',
@@ -164,7 +168,7 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
         </div>
       )}
 
-      {/* Top gradient scrim + close button, integrated like native camera UIs */}
+      {/* Top gradient scrim + close button */}
       <div
         className="absolute inset-x-0 top-0 pointer-events-none"
         style={{ height: 110, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)' }}

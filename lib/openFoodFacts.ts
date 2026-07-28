@@ -7,6 +7,7 @@ export interface OffProduct {
   p: number;
   f: number;
   c: number;
+  grams?: number; // package size, if determinable from product data
 }
 
 interface OffApiResponse {
@@ -15,6 +16,8 @@ interface OffApiResponse {
     product_name?: string;
     product_name_ru?: string;
     generic_name?: string;
+    quantity?: string;
+    product_quantity?: number; // normalized grams, when OFF provides it
     nutriments?: {
       'energy-kcal_100g'?: number;
       proteins_100g?: number;
@@ -24,6 +27,22 @@ interface OffApiResponse {
   };
 }
 
+/** Parses free-text quantity ("500 g", "1 L", "12x25g") into an approximate gram value. */
+function parseQuantityToGrams(quantity?: string): number | undefined {
+  if (!quantity) return undefined;
+  const m = quantity.match(/([\d.,]+)\s*(kg|g|l|ml)\b/i);
+  if (!m) return undefined;
+  const value = parseFloat(m[1].replace(',', '.'));
+  if (isNaN(value) || value <= 0) return undefined;
+  switch (m[2].toLowerCase()) {
+    case 'kg': return Math.round(value * 1000);
+    case 'g':  return Math.round(value);
+    case 'l':  return Math.round(value * 1000); // approx 1L ≈ 1000g
+    case 'ml': return Math.round(value);        // approx 1ml ≈ 1g
+    default:   return undefined;
+  }
+}
+
 /**
  * Looks up a product by barcode (EAN-13/UPC-A) on Open Food Facts.
  * Returns null if not found or if the product is missing energy data.
@@ -31,7 +50,7 @@ interface OffApiResponse {
 export async function fetchProductByBarcode(barcode: string): Promise<OffProduct | null> {
   try {
     const res = await fetch(
-      `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=product_name,product_name_ru,generic_name,nutriments`,
+      `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=product_name,product_name_ru,generic_name,nutriments,quantity,product_quantity`,
       { headers: { 'User-Agent': 'CalorieTracker - Personal PWA' } },
     );
     if (!res.ok) return null;
@@ -49,12 +68,17 @@ export async function fetchProductByBarcode(barcode: string): Promise<OffProduct
       data.product.generic_name ||
       'Продукт без названия';
 
+    const grams = data.product.product_quantity
+      ? Math.round(data.product.product_quantity)
+      : parseQuantityToGrams(data.product.quantity);
+
     return {
       name,
       kcal: Math.round(kcal),
       p: Math.round((n.proteins_100g ?? 0) * 10) / 10,
       f: Math.round((n.fat_100g ?? 0) * 10) / 10,
       c: Math.round((n.carbohydrates_100g ?? 0) * 10) / 10,
+      ...(grams ? { grams } : {}),
     };
   } catch (e) {
     console.error('[openFoodFacts] lookup failed', e);
