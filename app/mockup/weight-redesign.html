@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Редизайн экрана веса — одна карточка, линейка, стиль трекера</title>
+<style>
+  :root {
+    --chrome-bg: #f2f1ee; --chrome-bg-2: #ffffff; --chrome-text: #17171a;
+    --chrome-text-2: #63636b; --chrome-text-3: #97979e; --chrome-border: #e3e2de;
+    --chrome-accent: #ff375f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --chrome-bg:#0d0d0f; --chrome-bg-2:#17171a; --chrome-text:#f2f2f3; --chrome-text-2:#9d9da4; --chrome-text-3:#6b6b72; --chrome-border:#232327; }
+  }
+  :root[data-theme="dark"]  { --chrome-bg:#0d0d0f; --chrome-bg-2:#17171a; --chrome-text:#f2f2f3; --chrome-text-2:#9d9da4; --chrome-text-3:#6b6b72; --chrome-border:#232327; }
+  :root[data-theme="light"] { --chrome-bg:#f2f1ee; --chrome-bg-2:#ffffff; --chrome-text:#17171a; --chrome-text-2:#63636b; --chrome-text-3:#97979e; --chrome-border:#e3e2de; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--chrome-bg); color: var(--chrome-text); font-family: system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+  body { overflow-x: hidden; }
+
+  .page { max-width: 1180px; margin: 0 auto; padding: 48px 24px 80px; display: flex; flex-direction: column; gap: 40px; }
+  .intro { max-width: 660px; display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--chrome-accent); }
+  h1 { font-size: 27px; font-weight: 650; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+  .intro p { font-size: 15px; line-height: 1.55; color: var(--chrome-text-2); margin: 0; text-wrap: pretty; }
+
+  .layout { display: flex; gap: 48px; align-items: flex-start; flex-wrap: wrap; }
+
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; flex-shrink: 0; }
+  .phone-caption { font-size: 12px; color: var(--chrome-text-3); font-weight: 600; text-align: center; }
+  .phone { width: 375px; height: 780px; border-radius: 46px; background: #050506; padding: 12px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 30px 60px -20px rgba(0,0,0,0.5); position: relative; }
+  .phone-screen { width: 100%; height: 100%; border-radius: 36px; overflow: hidden; position: relative; background: #0a0a0b; }
+  .notch { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 100px; height: 26px; border-radius: 14px; background: #000; z-index: 50; }
+
+  .phone-screen {
+    --bg: #0a0a0b; --bg-card: #16161a; --bg-elevated: #1c1c20; --border: #26262d; --border-sub: #1f1f24;
+    --text-1: #f4f4f5; --text-2: #a1a1aa; --text-3: #71717a; --text-4: #3f3f46;
+    --success: #30d158; --danger: #ff453a;
+    font-family: system-ui, -apple-system, "SF Pro Display", "SF Pro Text", sans-serif;
+    display: flex; flex-direction: column;
+  }
+  .app-content { flex: 1; overflow-y: auto; padding-bottom: 40px; }
+  .app-content::-webkit-scrollbar { display: none; }
+
+  .app-header { display: flex; align-items: center; justify-content: space-between; padding: 44px 18px 10px; }
+  .menu-btn { width: 36px; height: 36px; border-radius: 18px; background: var(--bg-card); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
+  .app-header .title { font-size: 15px; font-weight: 650; color: var(--text-1); }
+  .header-spacer { width: 36px; }
+
+  /* ── Hero: single card = display + input ─────────────────────────── */
+  .hero {
+    margin: 6px 16px 0; border-radius: 20px; background: var(--bg-card);
+    border: 1px solid var(--border); padding: 20px 0 0; overflow: hidden;
+  }
+  .hero-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--text-3); text-align: center;
+  }
+  .hero-num-row { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin-top: 8px; }
+  .hero-num {
+    font-size: 64px; font-weight: 200; line-height: 1; letter-spacing: -0.04em;
+    color: var(--text-1); font-variant-numeric: tabular-nums;
+  }
+  .hero-unit { font-size: 16px; color: var(--text-3); }
+
+  .hero-chip-row { display: flex; justify-content: center; margin-top: 12px; }
+  .hero-chip {
+    display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 20px;
+    background: rgba(48,209,88,0.12); border: 1px solid rgba(48,209,88,0.26);
+    font-size: 11px; font-weight: 600; color: var(--success); font-variant-numeric: tabular-nums;
+  }
+
+  /* Ruler */
+  .ruler-wrap { position: relative; height: 64px; margin-top: 16px; cursor: grab; touch-action: pan-y; }
+  .ruler-wrap:active { cursor: grabbing; }
+  .ruler-strip { position: absolute; top: 12px; height: 40px; will-change: transform; }
+  .tick { position: absolute; bottom: 14px; width: 1.5px; border-radius: 1px; background: rgba(255,255,255,0.16); }
+  .tick.mid  { background: rgba(255,255,255,0.26); }
+  .tick.big  { background: rgba(255,255,255,0.42); }
+  .tick-label {
+    position: absolute; bottom: 0; transform: translateX(-50%);
+    font-size: 9px; font-weight: 600; color: var(--text-4); font-variant-numeric: tabular-nums;
+  }
+  .ruler-pointer {
+    position: absolute; left: 50%; top: 6px; transform: translateX(-50%);
+    width: 2px; height: 34px; border-radius: 1px; background: var(--text-1);
+    box-shadow: 0 0 8px rgba(255,255,255,0.45); pointer-events: none; z-index: 2;
+  }
+  .ruler-fade-l, .ruler-fade-r {
+    position: absolute; top: 0; bottom: 0; width: 70px; pointer-events: none; z-index: 1;
+  }
+  .ruler-fade-l { left: 0;  background: linear-gradient(to right, var(--bg-card), transparent); }
+  .ruler-fade-r { right: 0; background: linear-gradient(to left,  var(--bg-card), transparent); }
+
+  /* Contextual save bar */
+  .save-bar {
+    display: flex; justify-content: center; padding: 0 16px;
+    max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.2,0,0,1), opacity 0.3s cubic-bezier(0.2,0,0,1), padding 0.3s;
+  }
+  .save-bar.visible { max-height: 72px; opacity: 1; padding: 14px 16px 16px; }
+  .save-btn {
+    width: 100%; padding: 12px 0; border-radius: 12px; border: none;
+    background: #ffffff; color: #0a0a0b; font-size: 13.5px; font-weight: 700; cursor: pointer;
+    font-family: inherit; transition: transform 150ms ease-out, background 0.25s, color 0.25s;
+  }
+  .save-btn:active { transform: scale(0.96); }
+  .save-btn.saved { background: var(--success); color: #fff; }
+
+  /* Stat cards */
+  .stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 16px 0; }
+  .stat-card { border-radius: 16px; background: var(--bg-card); border: 1px solid var(--border); padding: 14px 16px; }
+  .stat-card .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-4); }
+  .stat-card .val { font-size: 22px; font-weight: 200; letter-spacing: -0.02em; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .stat-card .sub { font-size: 11px; color: var(--text-3); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+  /* Chart */
+  .chart-card { margin: 12px 16px 0; border-radius: 16px; background: var(--bg-card); border: 1px solid var(--border); padding: 16px; }
+  .chart-card .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-4); margin-bottom: 12px; }
+  .chart-card svg { display: block; width: 100%; }
+
+  /* History */
+  .history { margin: 16px 16px 0; }
+  .history .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-4); margin-bottom: 10px; }
+  .history-list { border-radius: 16px; border: 1px solid var(--border); overflow: hidden; }
+  .history-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; background: var(--bg-card); }
+  .history-row + .history-row { border-top: 1px solid var(--border-sub); }
+  .history-row .d { font-size: 13px; color: var(--text-2); }
+  .history-row .w { font-size: 13px; font-weight: 650; color: var(--text-1); font-variant-numeric: tabular-nums; }
+
+  /* Logic panel */
+  .logic-panel { flex: 1; min-width: 320px; max-width: 560px; display: flex; flex-direction: column; gap: 22px; }
+  .logic-card { background: var(--chrome-bg-2); border: 1px solid var(--chrome-border); border-radius: 16px; padding: 20px 22px; }
+  .logic-card h3 { font-size: 13px; font-weight: 700; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .logic-num { width: 20px; height: 20px; border-radius: 6px; background: var(--chrome-accent); color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .logic-card p { font-size: 13.5px; line-height: 1.6; color: var(--chrome-text-2); margin: 0 0 8px; }
+  .logic-card p:last-child { margin-bottom: 0; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; background: var(--chrome-border); padding: 1px 6px; border-radius: 5px; color: var(--chrome-text); }
+
+  @media (max-width: 860px) { .layout { justify-content: center; } .phone { width: 340px; height: 710px; } }
+  @media (max-width: 400px) { .phone { width: 300px; height: 630px; } }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="intro">
+    <p class="eyebrow">Мокап · Экран веса</p>
+    <h1>Одна карточка вместо двух гигантских чисел + линейка-весы</h1>
+    <p>
+      Ввод и отображение объединены: большое число — это и есть текущее значение,
+      под ним драг-линейка как на аналоговых весах (тяни влево/вправо, шаг 0.1 кг).
+      Кнопка сохранения появляется только когда значение изменилось. Стиль — тот же
+      язык, что у кольца: тонкие цифры, пилюли-чипы, стеклянные карточки.
+    </p>
+  </div>
+
+  <div class="layout">
+
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="notch"></div>
+          <div class="app-content">
+
+            <div class="app-header">
+              <div class="menu-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              </div>
+              <span class="title">Вес</span>
+              <div class="header-spacer"></div>
+            </div>
+
+            <!-- HERO: display + input in one -->
+            <div class="hero">
+              <p class="hero-label">Сегодня · 30 июля</p>
+              <div class="hero-num-row">
+                <span class="hero-num" id="heroNum">84.3</span>
+                <span class="hero-unit">кг</span>
+              </div>
+              <div class="hero-chip-row">
+                <span class="hero-chip" id="heroChip">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,3.5 5,6.5 8,3.5"/></svg>
+                  <span id="chipText">2.4&thinsp;кг от старта</span>
+                </span>
+              </div>
+
+              <div class="ruler-wrap" id="rulerWrap">
+                <div class="ruler-fade-l"></div>
+                <div class="ruler-fade-r"></div>
+                <div class="ruler-pointer"></div>
+                <div class="ruler-strip" id="rulerStrip"></div>
+              </div>
+
+              <div class="save-bar" id="saveBar">
+                <button class="save-btn" id="saveBtn">Сохранить 84.3 кг</button>
+              </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stat-row">
+              <div class="stat-card">
+                <p class="lbl">За всё время</p>
+                <p class="val" style="color: var(--success);">−2.4 кг</p>
+                <p class="sub">86.7 → 84.3 · 47 замеров</p>
+              </div>
+              <div class="stat-card">
+                <p class="lbl">Тренд 7 дней</p>
+                <p class="val" style="color: var(--success);">−0.4 кг</p>
+                <p class="sub">ср. 7д vs пред. 7д</p>
+              </div>
+            </div>
+
+            <!-- Chart with area fill -->
+            <div class="chart-card">
+              <p class="lbl">Динамика веса</p>
+              <svg viewBox="0 0 320 140" height="140">
+                <defs>
+                  <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="rgba(226,228,255,0.16)"/>
+                    <stop offset="100%" stop-color="rgba(226,228,255,0)"/>
+                  </linearGradient>
+                </defs>
+                <g stroke="rgba(255,255,255,0.05)" stroke-width="1">
+                  <line x1="0" y1="35" x2="320" y2="35"/><line x1="0" y1="70" x2="320" y2="70"/><line x1="0" y1="105" x2="320" y2="105"/>
+                </g>
+                <path d="M8,28 L47,38 L86,34 L125,52 L164,58 L203,74 L242,70 L281,88 L312,96 L312,140 L8,140 Z" fill="url(#areaFill)"/>
+                <path d="M8,28 L47,38 L86,34 L125,52 L164,58 L203,74 L242,70 L281,88 L312,96"
+                  fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2" stroke-linejoin="round"
+                  style="filter: drop-shadow(0 0 6px rgba(255,255,255,0.25))"/>
+                <circle cx="312" cy="96" r="3.5" fill="#fff" style="filter: drop-shadow(0 0 5px rgba(255,255,255,0.6))"/>
+                <g font-size="9" fill="#3f3f46" font-family="system-ui">
+                  <text x="8" y="136">10 июн</text><text x="150" y="136">5 июл</text><text x="285" y="136">30 июл</text>
+                </g>
+              </svg>
+            </div>
+
+            <!-- History -->
+            <div class="history">
+              <p class="lbl">История</p>
+              <div class="history-list">
+                <div class="history-row"><span class="d">Сегодня</span><span class="w">84.3 кг</span></div>
+                <div class="history-row"><span class="d">Вчера</span><span class="w">84.5 кг</span></div>
+                <div class="history-row"><span class="d">28 июля</span><span class="w">84.4 кг</span></div>
+                <div class="history-row"><span class="d">27 июля</span><span class="w">84.8 кг</span></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+      <p class="phone-caption">потяни линейку под числом — шаг 0.1 кг</p>
+    </div>
+
+    <div class="logic-panel">
+
+      <div class="logic-card">
+        <h3><span class="logic-num">1</span>Одна карточка = отображение + ввод</h3>
+        <p>
+          Раньше: карточка ввода со своим числом (52px) и сразу под ней карточка
+          «кг сегодня» с тем же числом ещё крупнее (72px). Теперь большое число одно —
+          оно и показывает текущее значение, и меняется линейкой. Чип «от старта»
+          переехал в эту же карточку — тот же стиль пилюли со стрелкой, что чип
+          дефицита в центре кольца калорий.
+        </p>
+      </div>
+
+      <div class="logic-card">
+        <h3><span class="logic-num">2</span>Линейка-весы вместо кнопок ±</h3>
+        <p>
+          Драг влево/вправо, шаг 0.1 кг, короткая вибрация на каждый тик (в проде —
+          <code>haptic('light')</code>). Метафора аналоговых весов, крупные деления
+          на каждом килограмме с подписью. Быстрее семи тапов по ± и тактильно приятнее.
+          Края линейки растворяются градиентом в фон карточки.
+        </p>
+      </div>
+
+      <div class="logic-card">
+        <h3><span class="logic-num">3</span>Сохранение — только когда есть что сохранять</h3>
+        <p>
+          Кнопка не занимает место постоянно: плавно выезжает, когда значение
+          отличается от сохранённого, показывает конкретное число («Сохранить 83.8 кг»),
+          после сохранения — зелёная вспышка и сворачивается обратно.
+        </p>
+      </div>
+
+      <div class="logic-card">
+        <h3><span class="logic-num">4</span>Стилевые правки остального</h3>
+        <p>
+          Карточки статистики: числа тоньше (font-weight 200, как у кольца), лейблы
+          в едином uppercase-стиле. График: под линией — деликатная градиентная
+          заливка, светящаяся точка на последнем замере (как endpoint у кольца).
+          История без изменений по функциям, только выравнивание типографики.
+        </p>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const PX_PER_KG = 80;         // 8px per 0.1kg
+  const MIN_W = 78, MAX_W = 92;
+  const SAVED = 84.5;           // yesterday's value = starting point
+  let value = 84.3;
+  let savedValue = value;
+
+  const strip = document.getElementById('rulerStrip');
+  const wrap  = document.getElementById('rulerWrap');
+  const num   = document.getElementById('heroNum');
+  const bar   = document.getElementById('saveBar');
+  const btn   = document.getElementById('saveBtn');
+  const chip  = document.getElementById('heroChip');
+  const chipText = document.getElementById('chipText');
+  const START_W = 86.7;
+
+  // Build ticks
+  let html = '';
+  for (let v = MIN_W * 10; v <= MAX_W * 10; v++) {
+    const kg = v / 10;
+    const x = (kg - MIN_W) * PX_PER_KG;
+    const isBig = v % 10 === 0;
+    const isMid = !isBig && v % 5 === 0;
+    const h = isBig ? 22 : isMid ? 15 : 9;
+    html += '<div class="tick' + (isBig ? ' big' : isMid ? ' mid' : '') + '" style="left:' + x + 'px; height:' + h + 'px;"></div>';
+    if (isBig) html += '<div class="tick-label" style="left:' + x + 'px;">' + kg + '</div>';
+  }
+  strip.innerHTML = html;
+  strip.style.width = ((MAX_W - MIN_W) * PX_PER_KG) + 'px';
+
+  function position() {
+    const center = wrap.getBoundingClientRect().width / 2;
+    const offset = center - (value - MIN_W) * PX_PER_KG;
+    strip.style.transform = 'translateX(' + offset + 'px)';
+  }
+
+  function refresh() {
+    num.textContent = value.toFixed(1);
+    const dirty = Math.abs(value - savedValue) > 0.001;
+    bar.classList.toggle('visible', dirty);
+    if (dirty) { btn.textContent = 'Сохранить ' + value.toFixed(1) + ' кг'; btn.classList.remove('saved'); }
+    const delta = value - START_W;
+    chipText.innerHTML = Math.abs(delta).toFixed(1) + ' кг от старта';
+    const good = delta < 0;
+    chip.style.background = good ? 'rgba(48,209,88,0.12)' : 'rgba(255,69,58,0.12)';
+    chip.style.borderColor = good ? 'rgba(48,209,88,0.26)' : 'rgba(255,69,58,0.26)';
+    chip.style.color = good ? '#30d158' : '#ff453a';
+    position();
+  }
+
+  let dragging = false, startClientX = 0, startValue = value, lastTick = value;
+  function dStart(cx) { dragging = true; startClientX = cx; startValue = value; strip.style.transition = 'none'; }
+  function dMove(cx) {
+    if (!dragging) return;
+    const dv = -(cx - startClientX) / PX_PER_KG;
+    const next = Math.round(Math.min(MAX_W, Math.max(MIN_W, startValue + dv)) * 10) / 10;
+    if (next !== value) {
+      value = next;
+      if (Math.abs(value - lastTick) >= 0.1) { lastTick = value; if (navigator.vibrate) try { navigator.vibrate(5); } catch(e){} }
+      refresh();
+    }
+  }
+  function dEnd() { dragging = false; }
+
+  wrap.addEventListener('touchstart', e => dStart(e.touches[0].clientX), { passive: true });
+  wrap.addEventListener('touchmove',  e => dMove(e.touches[0].clientX),  { passive: true });
+  wrap.addEventListener('touchend', dEnd, { passive: true });
+  wrap.addEventListener('mousedown', e => {
+    dStart(e.clientX);
+    const mm = ev => dMove(ev.clientX);
+    const mu = () => { dEnd(); document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); };
+    document.addEventListener('mousemove', mm);
+    document.addEventListener('mouseup', mu);
+  });
+
+  btn.addEventListener('click', function () {
+    savedValue = value;
+    btn.textContent = '✓ Сохранено';
+    btn.classList.add('saved');
+    setTimeout(() => bar.classList.remove('visible'), 900);
+  });
+
+  window.addEventListener('resize', position);
+  refresh();
+})();
+</script>
+</body>
+</html>
