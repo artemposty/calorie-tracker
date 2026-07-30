@@ -2,17 +2,8 @@ import { FoodEntry } from './types';
 
 export type MealGroupName = 'Завтрак' | 'Обед' | 'Ужин' | 'Перекус';
 
-// Small portions read as a snack regardless of when they were eaten.
-const SNACK_MAX_KCAL = 200;
-
-/** Завтрак 04–12, Обед 12–18, Ужин 18–04 (wraps past midnight). */
-export function classifyEntry(entry: FoodEntry): MealGroupName {
-  if (entry.kcal <= SNACK_MAX_KCAL) return 'Перекус';
-  const hour = new Date(entry.time).getHours();
-  if (hour >= 4 && hour < 12) return 'Завтрак';
-  if (hour >= 12 && hour < 18) return 'Обед';
-  return 'Ужин';
-}
+const CLUSTER_GAP_MIN = 15; // entries within this many minutes of each other = one sitting
+const MEAL_SLOTS: Exclude<MealGroupName, 'Перекус'>[] = ['Завтрак', 'Обед', 'Ужин'];
 
 export interface MealGroup {
   name: MealGroupName;
@@ -20,20 +11,57 @@ export interface MealGroup {
   totalKcal: number;
 }
 
-/** Groups entries by meal period, sections ordered by their earliest entry's time. */
-export function groupMeals(entries: FoodEntry[]): MealGroup[] {
-  const groups = new Map<MealGroupName, FoodEntry[]>();
-  for (const e of entries) {
-    const label = classifyEntry(e);
-    if (!groups.has(label)) groups.set(label, []);
-    groups.get(label)!.push(e);
-  }
+interface Cluster {
+  entries: FoodEntry[];
+  totalKcal: number;
+  earliestTime: string;
+}
 
-  const result: MealGroup[] = [];
-  for (const [name, list] of groups) {
-    const sorted = list.slice().sort((a, b) => a.time.localeCompare(b.time));
-    result.push({ name, entries: sorted, totalKcal: Math.round(sorted.reduce((s, e) => s + e.kcal, 0)) });
+function toMinutes(iso: string): number {
+  return new Date(iso).getTime() / 60000;
+}
+
+/** Splits time-sorted entries into "sittings" — gaps >15min start a new cluster. */
+function clusterByGap(sorted: FoodEntry[]): Cluster[] {
+  const clusters: Cluster[] = [];
+  for (const e of sorted) {
+    const last = clusters[clusters.length - 1];
+    if (last && toMinutes(e.time) - toMinutes(last.entries[last.entries.length - 1].time) <= CLUSTER_GAP_MIN) {
+      last.entries.push(e);
+      last.totalKcal += e.kcal;
+    } else {
+      clusters.push({ entries: [e], totalKcal: e.kcal, earliestTime: e.time });
+    }
   }
-  result.sort((a, b) => a.entries[0].time.localeCompare(b.entries[0].time));
-  return result;
+  return clusters;
+}
+
+/**
+ * Clusters entries into "sittings" (gap ≤15min = same sitting), picks the top 3
+ * by calories as the day's real meals, then labels those three Завтрак/Обед/Ужин
+ * in whatever order they actually happened — no fixed clock-hour windows. Every
+ * other sitting is a Перекус. Sections render in chronological order.
+ */
+export function groupMeals(entries: FoodEntry[]): MealGroup[] {
+  if (entries.length === 0) return [];
+
+  const sorted = entries.slice().sort((a, b) => a.time.localeCompare(b.time));
+  const clusters = clusterByGap(sorted);
+
+  const mealClusters = clusters
+    .slice()
+    .sort((a, b) => b.totalKcal - a.totalKcal)
+    .slice(0, 3)
+    .sort((a, b) => a.earliestTime.localeCompare(b.earliestTime));
+
+  const mealSet = new Set(mealClusters);
+  const result: MealGroup[] = clusters.map(c => {
+    const slotIdx = mealClusters.indexOf(c);
+    const name: MealGroupName = mealSet.has(c) ? MEAL_SLOTS[slotIdx] : 'Перекус';
+    return { name, entries: c.entries, totalKcal: Math.round(c.totalKcal) };
+  });
+
+  // Multiple snack clusters would collide on the 'Перекус' key when rendered —
+  // callers key by array index, not by name, so this is safe as-is.
+  return result.sort((a, b) => a.entries[0].time.localeCompare(b.entries[0].time));
 }

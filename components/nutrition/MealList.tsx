@@ -43,17 +43,16 @@ function formatTime(iso: string): string {
 interface SwipeRowProps {
   children: React.ReactNode;
   onDelete: () => void;
-  onTap: () => void;
+  onEdit: () => void;
 }
 
-function SwipeRow({ children, onDelete, onTap }: SwipeRowProps) {
+function SwipeRow({ children, onDelete, onEdit }: SwipeRowProps) {
   const [offset, setOffset] = useState(0);
   const [snapping, setSnapping] = useState(false);
   const [awaitConfirm, setAwaitConfirm] = useState(false);
   const startX = useRef(0);
   const startY = useRef(0);
   const direction = useRef<'h' | 'v' | null>(null);
-  const didDrag = useRef(false);
   const rowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -67,12 +66,11 @@ function SwipeRow({ children, onDelete, onTap }: SwipeRowProps) {
       if (!direction.current) {
         if (Math.abs(dx) > Math.abs(dy) + 6) direction.current = 'h';
         else if (Math.abs(dy) > 6) direction.current = 'v';
-        if (direction.current === 'h') didDrag.current = true;
         return;
       }
       if (direction.current === 'h') {
         e.preventDefault();
-        if (dx < 0) setOffset(Math.max(dx, -80));
+        setOffset(Math.max(-80, Math.min(80, dx)));
       }
     }
 
@@ -85,7 +83,6 @@ function SwipeRow({ children, onDelete, onTap }: SwipeRowProps) {
     startX.current = e.touches[0].clientX;
     startY.current = e.touches[0].clientY;
     direction.current = null;
-    didDrag.current = false;
     setSnapping(false);
   }
 
@@ -95,11 +92,14 @@ function SwipeRow({ children, onDelete, onTap }: SwipeRowProps) {
       haptic('medium');
       setOffset(-80);
       setAwaitConfirm(true);
+    } else if (offset >= 65) {
+      haptic('light');
+      setOffset(0);
+      onEdit();
     } else {
-      if (offset < -8) haptic('light');
+      if (Math.abs(offset) > 8) haptic('light');
       setOffset(0);
       setAwaitConfirm(false);
-      if (!didDrag.current) onTap();
     }
   }
 
@@ -119,6 +119,17 @@ function SwipeRow({ children, onDelete, onTap }: SwipeRowProps) {
 
   return (
     <div style={{ position: 'relative', overflow: 'hidden' }}>
+      {/* Edit reveal — left side */}
+      <div
+        className="absolute inset-y-0 left-0 flex items-center justify-center"
+        style={{ width: 80, background: 'var(--carbs)' }}
+      >
+        <svg width="18" height="18" fill="none" stroke="white" strokeWidth="1.8" viewBox="0 0 24 24">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
+      </div>
+      {/* Delete reveal — right side */}
       <div
         className="absolute inset-y-0 right-0 flex items-center justify-center"
         style={{ width: 80, background: 'var(--danger)' }}
@@ -173,7 +184,7 @@ function EntryRow({ entry, editing, onToggleEdit, onDelete, onSave }: EntryRowPr
 
   return (
     <div>
-      <SwipeRow onDelete={onDelete} onTap={onToggleEdit}>
+      <SwipeRow onDelete={onDelete} onEdit={onToggleEdit}>
         <div className="flex items-center gap-3 px-4 py-3.5">
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm truncate" style={{ color: 'var(--text-1)' }}>
@@ -252,8 +263,8 @@ export function MealList({ entries, onDelete, onEdit }: Props) {
 
   return (
     <div className="px-4 flex flex-col gap-4">
-      {groups.map(group => (
-        <div key={group.name}>
+      {groups.map((group, gi) => (
+        <div key={gi}>
           <div className="flex items-center gap-2 mb-2 px-0.5">
             <div className="w-[22px] h-[22px] rounded-[7px] flex items-center justify-center shrink-0" style={{ background: 'var(--bg-elevated)', color: 'var(--text-2)' }}>
               {GROUP_ICON[group.name]}
