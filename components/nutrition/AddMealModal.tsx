@@ -28,7 +28,6 @@ interface QuickAddItem {
   fPer100: number;
   cPer100: number;
   grams: number;
-  badge?: string;
   onDelete?: () => void;
 }
 
@@ -103,16 +102,12 @@ function QuickAddRow({ item, onAdd }: { item: QuickAddItem; onAdd: (grams: numbe
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-[13.5px] font-semibold truncate" style={{ color: 'var(--text-1)' }}>{item.name}</p>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <p className="text-[11.5px] tabular-nums" style={{ color: 'var(--text-3)' }}>{item.grams} г</p>
-            {item.badge && (
-              <span className="text-[9.5px] font-bold px-1.5 rounded" style={{ background: 'rgba(48,209,88,0.14)', color: 'var(--success)' }}>
-                {item.badge}
-              </span>
-            )}
-          </div>
+          <p className="text-[11.5px] tabular-nums mt-0.5" style={{ color: 'var(--text-3)' }}>{item.grams} г</p>
         </div>
-        <p className="text-[13px] font-bold tabular-nums shrink-0" style={{ color: 'var(--text-2)' }}>{displayKcal}</p>
+        <div className="text-right shrink-0">
+          <p className="text-[13px] font-bold tabular-nums" style={{ color: 'var(--text-2)' }}>{displayKcal}</p>
+          <p className="text-[9px] font-medium" style={{ color: 'var(--text-4)' }}>ккал</p>
+        </div>
         {item.onDelete && (
           <button
             onClick={e => { e.stopPropagation(); haptic('medium'); item.onDelete!(); }}
@@ -423,7 +418,6 @@ export function AddMealModal({ nutritionData, onAdd, onDelete, onClose }: Props)
                           pPer100:    r.grams > 0 ? r.p / r.grams * 100    : 0,
                           fPer100:    r.grams > 0 ? r.f / r.grams * 100    : 0,
                           cPer100:    r.grams > 0 ? r.c / r.grams * 100    : 0,
-                          badge: r.timeMatch ? 'обычно сейчас' : undefined,
                         }}
                         onAdd={grams => handleQuickAdd({ name: r.name, kcalPer100: r.grams > 0 ? r.kcal / r.grams * 100 : 0, pPer100: r.grams > 0 ? r.p / r.grams * 100 : 0, fPer100: r.grams > 0 ? r.f / r.grams * 100 : 0, cPer100: r.grams > 0 ? r.c / r.grams * 100 : 0 }, grams)}
                       />
