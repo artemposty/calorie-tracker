@@ -74,6 +74,14 @@ export function useNutrition() {
     sb(supabase.from('nutrition_entries').delete().eq('id', id));
   }, []);
 
+  const updateEntry = useCallback((date: string, id: string, updates: { grams: number; kcal: number; p: number; f: number; c: number }) => {
+    setData(prev => ({
+      ...prev,
+      [date]: (prev[date] ?? []).map(e => e.id === id ? { ...e, ...updates } : e),
+    }));
+    sb(supabase.from('nutrition_entries').update(updates).eq('id', id));
+  }, []);
+
   const getDayEntries = useCallback(
     (date: string): FoodEntry[] => data[date] ?? [],
     [data]
@@ -102,5 +110,5 @@ export function useNutrition() {
     setData(newData);
   }, []);
 
-  return { data, loaded, addEntry, addEntries, deleteEntry, getDayEntries, replaceAll };
+  return { data, loaded, addEntry, addEntries, deleteEntry, updateEntry, getDayEntries, replaceAll };
 }

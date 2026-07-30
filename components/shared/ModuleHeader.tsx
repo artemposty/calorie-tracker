@@ -55,7 +55,7 @@ export function ModuleHeader({ title, onMenuOpen, date, onPrev, onNext, onDateCh
       </button>
 
       {/* Center: date picker or title */}
-      {date && formatted && onPrev && onNext && onDateChange ? (
+      {date && formatted && onDateChange ? (
         <div className="relative flex flex-col items-center gap-0.5 px-4">
           <div className="flex items-center gap-2 pointer-events-none">
             <span className="text-base font-semibold" style={{ color: 'var(--text-1)' }}>{formatted.weekday}</span>

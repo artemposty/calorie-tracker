@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { Goals, FoodEntry } from '@/lib/types';
-import { getTodayDate, shiftDate, calcTotals } from '@/lib/storage';
+import { getTodayDate, calcTotals } from '@/lib/storage';
 import { haptic } from '@/lib/haptics';
 import { ModuleHeader } from '@/components/shared/ModuleHeader';
 import { CalorieDisplay } from './CalorieDisplay';
 import { MacroProgress } from './MacroProgress';
 import { MealList } from './MealList';
+import { WeekStrip } from './WeekStrip';
 import { AddMealModal } from './AddMealModal';
 import { StatsTab } from '@/components/stats/StatsTab';
 import { useTodayTonnage } from '@/hooks/useWorkout';
@@ -22,10 +23,11 @@ interface Props {
   addEntry: (date: string, entry: Omit<FoodEntry, 'id' | 'time'>) => string;
   addEntries: (date: string, entries: Omit<FoodEntry, 'id' | 'time'>[]) => void;
   deleteEntry: (date: string, id: string) => void;
+  updateEntry: (date: string, id: string, updates: { grams: number; kcal: number; p: number; f: number; c: number }) => void;
   onMenuOpen: () => void;
 }
 
-export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, addEntries, deleteEntry, onMenuOpen }: Props) {
+export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, addEntries, deleteEntry, updateEntry, onMenuOpen }: Props) {
   const [subTab, setSubTab] = useState<SubTab>('tracker');
   const [date, setDate] = useState(getTodayDate);
   const [showAdd, setShowAdd] = useState(false);
@@ -43,14 +45,18 @@ export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, ad
         <ModuleHeader
           onMenuOpen={onMenuOpen}
           date={subTab === 'tracker' ? date : undefined}
-          onPrev={subTab === 'tracker' ? () => setDate(d => shiftDate(d, -1)) : undefined}
-          onNext={subTab === 'tracker' ? () => setDate(d => shiftDate(d, 1)) : undefined}
           onDateChange={subTab === 'tracker' ? setDate : undefined}
           title={subTab === 'stats' ? 'Статистика' : undefined}
         />
 
         {subTab === 'tracker' && (
           <>
+            <WeekStrip
+              selectedDate={date}
+              onSelectDate={setDate}
+              nutritionData={nutritionData}
+              goalKcal={goals.kcal}
+            />
             <CalorieDisplay
               totals={totals}
               goals={goals}
@@ -59,7 +65,11 @@ export function NutritionTab({ goals, nutritionData, getDayEntries, addEntry, ad
             />
             <MacroProgress totals={totals} goals={goals} />
             <div className="enter-stagger" style={{ animationDelay: '160ms' }}>
-              <MealList entries={entries} onDelete={id => deleteEntry(date, id)} />
+              <MealList
+                entries={entries}
+                onDelete={id => deleteEntry(date, id)}
+                onEdit={(id, updates) => updateEntry(date, id, updates)}
+              />
             </div>
           </>
         )}

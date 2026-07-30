@@ -77,6 +77,7 @@ export default function Home() {
               addEntry={nutrition.addEntry}
               addEntries={nutrition.addEntries}
               deleteEntry={nutrition.deleteEntry}
+              updateEntry={nutrition.updateEntry}
               onMenuOpen={openDrawer}
             />
           )}
