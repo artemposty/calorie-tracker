@@ -109,7 +109,11 @@ function WeekPanel({ monday, selectedDate, today, nutritionData, goalKcal, mount
 }) {
   const days = weekDaysOf(monday);
   return (
-    <div className="flex justify-between gap-1" style={{ width, flexShrink: 0 }}>
+    // Horizontal padding lives INSIDE each panel: the outer container is
+    // measured with getBoundingClientRect(), and padding on the measured
+    // element would make every panel 24px wider than the visible content box
+    // (ВС overflowing the right edge).
+    <div className="flex justify-between gap-1" style={{ width, flexShrink: 0, padding: '0 12px' }}>
       {days.map((dateStr, i) => {
         const cell: DayCellData = {
           dateStr,
@@ -185,7 +189,9 @@ export function WeekStrip({ selectedDate, onSelectDate, nutritionData, goalKcal 
       locked.current = Math.abs(rawDx) > Math.abs(rawDy) ? 'h' : 'v';
     }
     if (locked.current !== 'h') return;
-    if (e.cancelable) e.preventDefault();
+    // No preventDefault here: React root touch listeners are passive, so the
+    // call would be a no-op console error. touchAction: 'pan-y' on the
+    // container already stops the browser from hijacking horizontal drags.
 
     const wantsFuture = rawDx < 0;
     const blocked = isCurrentWeek && wantsFuture;
@@ -225,7 +231,7 @@ export function WeekStrip({ selectedDate, onSelectDate, nutritionData, goalKcal 
   return (
     <div
       ref={outerRef}
-      className="px-3 pb-1"
+      className="pb-1"
       style={{ overflow: 'hidden', touchAction: 'pan-y' }}
       onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
     >
@@ -239,7 +245,7 @@ export function WeekStrip({ selectedDate, onSelectDate, nutritionData, goalKcal 
             nutritionData={nutritionData}
             goalKcal={goalKcal}
             mounted={mounted}
-            onSelectDate={onSelectDate}
+            onSelectDate={d => { if (!animating.current) onSelectDate(d); }}
             width={containerWidth}
           />
         ))}
