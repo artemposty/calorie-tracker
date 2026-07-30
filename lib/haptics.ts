@@ -1,15 +1,17 @@
-// Haptic feedback that also works on iOS.
+// Haptic feedback.
 //
-// navigator.vibrate exists only on Android — iOS Safari (including installed
-// PWAs) has no Vibration API at all, which is why haptics never fired here.
-// Since iOS 17.4 a native <input type="checkbox" switch> emits a real haptic
-// tick when toggled. Requirements learned the hard way:
-//   • the element must already be in the DOM before the gesture, not created
-//     inside it
-//   • it must be genuinely rendered — display:none / visibility:hidden /
-//     opacity:0 all suppress the haptic, so we park it off-screen instead
-//   • the toggle must happen inside a user-gesture call stack (all haptic()
-//     callers are click/touch handlers, so this holds)
+// Android: navigator.vibrate, works normally.
+//
+// iOS: Safari has never implemented the Vibration API. The only known way to
+// reach the Taptic Engine from the web was a quirk of the native
+// <input type="checkbox" switch> control (Safari 17.4+), which emits a haptic
+// tick when toggled. WebKit ignores a script-driven click on the input itself,
+// so the trick is to click an associated <label> instead.
+//
+// Apple patched this in iOS 26.5 — on 26.5 and newer there is currently no way
+// to trigger haptics from a web page at all. The code below still runs so
+// devices on iOS 17.4–26.4 keep their feedback; on newer versions it is simply
+// a no-op rather than an error.
 
 type HapticType = 'light' | 'medium' | 'heavy' | 'success' | 'error';
 
@@ -26,35 +28,46 @@ const IOS_TICKS: Record<HapticType, number> = {
   light: 1, medium: 1, heavy: 1, success: 2, error: 3,
 };
 
-let iosSwitch: HTMLInputElement | null = null;
-let iosReady = false;
+const SWITCH_ID = 'ct-haptic-switch';
 
-function ensureIosSwitch() {
-  if (iosReady || typeof document === 'undefined') return;
-  iosReady = true;
+let hapticLabel: HTMLLabelElement | null = null;
+let mounted = false;
 
-  const mount = () => {
-    if (iosSwitch) return;
-    const el = document.createElement('input');
-    el.type = 'checkbox';
-    // Attribute (not property) — this is what makes iOS render it as a switch.
-    el.setAttribute('switch', '');
-    el.tabIndex = -1;
-    el.setAttribute('aria-hidden', 'true');
-    // Off-screen but fully rendered: opacity/visibility/display tricks kill
-    // the haptic, moving it out of the viewport does not.
-    el.style.cssText =
-      'position:fixed;left:-9999px;top:0;width:32px;height:20px;margin:0;pointer-events:none;';
-    document.body.appendChild(el);
-    iosSwitch = el;
+function mountIosSwitch() {
+  if (mounted || typeof document === 'undefined') return;
+  mounted = true;
+
+  const build = () => {
+    if (hapticLabel || document.getElementById(SWITCH_ID)) return;
+
+    // Parked off-screen rather than hidden: display:none / visibility:hidden /
+    // opacity:0 all suppress the haptic, being outside the viewport does not.
+    const holder = document.createElement('div');
+    holder.setAttribute('aria-hidden', 'true');
+    holder.style.cssText = 'position:fixed;left:-9999px;top:0;pointer-events:none;';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    // Attribute, not property — this is what makes WebKit render a switch.
+    input.setAttribute('switch', '');
+    input.id = SWITCH_ID;
+    input.tabIndex = -1;
+
+    const label = document.createElement('label');
+    label.htmlFor = SWITCH_ID;
+
+    holder.append(input, label);
+    document.body.appendChild(holder);
+    hapticLabel = label;
   };
 
-  if (document.body) mount();
-  else document.addEventListener('DOMContentLoaded', mount, { once: true });
+  if (document.body) build();
+  else document.addEventListener('DOMContentLoaded', build, { once: true });
 }
 
-// Mount as early as the module is first imported on the client.
-ensureIosSwitch();
+// Mount as soon as this module is first imported on the client, so the element
+// already exists by the time a gesture handler calls haptic().
+mountIosSwitch();
 
 export function haptic(type: HapticType = 'light') {
   if (typeof navigator === 'undefined') return;
@@ -64,21 +77,14 @@ export function haptic(type: HapticType = 'light') {
     return;
   }
 
-  ensureIosSwitch();
-  const el = iosSwitch;
-  if (!el) return;
-
-  const tick = () => {
-    // Flipping the state is what triggers the feedback; either direction works.
-    el.checked = !el.checked;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    el.click();
-  };
+  mountIosSwitch();
+  const label = hapticLabel;
+  if (!label) return;
 
   try {
-    tick();
+    label.click();
     for (let i = 1; i < IOS_TICKS[type]; i++) {
-      setTimeout(tick, i * 90);
+      setTimeout(() => label.click(), i * 90);
     }
   } catch { /* noop */ }
 }
