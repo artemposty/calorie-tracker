@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { getTodayDate, shiftDate } from '@/lib/storage';
 import { haptic } from '@/lib/haptics';
-import { useWorkout, useWeeklyVolume } from '@/hooks/useWorkout';
+import { useWorkout, useWeeklyVolume, useWorkoutTonnageByDate, useLastWorkoutInfo } from '@/hooks/useWorkout';
 import { useExercises } from '@/hooks/useExercises';
 import { ModuleHeader } from '@/components/shared/ModuleHeader';
+import { WeekStrip, DayBar } from '@/components/shared/WeekStrip';
 import { TodayCard } from './TodayCard';
 import { WeeklyVolumeCard } from './WeeklyVolumeCard';
 import { AddSetModal } from './AddSetModal';
@@ -18,13 +19,46 @@ interface Props {
   onMenuOpen: () => void;
 }
 
+function plural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
 export function WorkoutTab({ onMenuOpen }: Props) {
+  const today = getTodayDate();
   const [subTab, setSubTab] = useState<SubTab>('today');
-  const [date, setDate] = useState(getTodayDate);
+  const [date, setDate] = useState(today);
   const { byExercise, totalSets, totalTonnage, loading, addSet, deleteSet } = useWorkout(date);
   const { exercises, loading: exLoading, addExercise, updateExercise, deleteExercise } = useExercises();
   const { volume, loading: volLoading } = useWeeklyVolume();
   const [showAdd, setShowAdd] = useState(false);
+  const [prefillExerciseId, setPrefillExerciseId] = useState<string | null>(null);
+
+  // Tonnage for the week strip: last 10 weeks is plenty of swipe-back room
+  const tonnageByDate = useWorkoutTonnageByDate(shiftDate(today, -70), today);
+  const lastWorkout = useLastWorkoutInfo(date);
+
+  const getDayBar = useCallback((dateStr: string): DayBar => {
+    // The selected day's tonnage comes from the live useWorkout data so the
+    // bar updates immediately when a set is added, without a refetch.
+    const t = dateStr === date ? totalTonnage : (tonnageByDate[dateStr] ?? 0);
+    if (t <= 0) return { frac: 0, color: null };
+    const all = Object.values(tonnageByDate);
+    const maxT = Math.max(...all, totalTonnage, 1);
+    return {
+      frac: Math.max(0.14, t / maxT),
+      color: dateStr === today ? '#f4f4f5' : 'rgba(222,226,255,0.65)',
+    };
+  }, [tonnageByDate, date, totalTonnage, today]);
+
+  const exerciseCount = Object.keys(byExercise).length;
+
+  function openAddFor(exerciseId: string | null) {
+    setPrefillExerciseId(exerciseId);
+    setShowAdd(true);
+  }
 
   return (
     <>
@@ -32,25 +66,38 @@ export function WorkoutTab({ onMenuOpen }: Props) {
         <ModuleHeader
           onMenuOpen={onMenuOpen}
           date={subTab === 'today' ? date : undefined}
-          onPrev={subTab === 'today' ? () => setDate(d => shiftDate(d, -1)) : undefined}
-          onNext={subTab === 'today' ? () => setDate(d => shiftDate(d, 1)) : undefined}
           onDateChange={subTab === 'today' ? setDate : undefined}
           title={subTab === 'exercises' ? 'Упражнения' : subTab === 'stats' ? 'Статистика' : undefined}
         />
 
         {subTab === 'today' && (
           <>
+            <WeekStrip selectedDate={date} onSelectDate={setDate} getDay={getDayBar} />
+
+            {totalSets > 0 && (
+              <p className="text-center text-xs tabular-nums -mt-1" style={{ color: 'var(--text-3)' }}>
+                <b className="font-semibold" style={{ color: 'var(--text-1)' }}>{totalSets}</b>
+                {' '}{plural(totalSets, 'подход', 'подхода', 'подходов')} ·{' '}
+                <b className="font-semibold" style={{ color: 'var(--text-1)' }}>{exerciseCount}</b>
+                {' '}{plural(exerciseCount, 'упражнение', 'упражнения', 'упражнений')}
+              </p>
+            )}
+
             {loading ? (
               <div className="px-4"><div className="skeleton h-20 rounded-2xl" /></div>
             ) : (
-              <TodayCard
-                byExercise={byExercise}
-                totalSets={totalSets}
-                totalTonnage={totalTonnage}
-                onDelete={deleteSet}
-              />
+              <div className="enter-stagger">
+                <TodayCard
+                  byExercise={byExercise}
+                  onDelete={deleteSet}
+                  onAddSet={id => openAddFor(id)}
+                  lastWorkout={lastWorkout}
+                />
+              </div>
             )}
-            <WeeklyVolumeCard volume={volume} loading={volLoading} />
+            <div className="enter-stagger" style={{ animationDelay: '80ms' }}>
+              <WeeklyVolumeCard volume={volume} loading={volLoading} />
+            </div>
           </>
         )}
 
@@ -72,7 +119,7 @@ export function WorkoutTab({ onMenuOpen }: Props) {
       {/* FAB — only on today tab */}
       {subTab === 'today' && (
         <button
-          onClick={() => { haptic('medium'); setShowAdd(true); }}
+          onClick={() => { haptic('medium'); openAddFor(null); }}
           className="fixed z-10 flex items-center justify-center active:scale-[0.96] transition-transform duration-150 ease-out"
           style={{
             right: 20,
@@ -132,11 +179,13 @@ export function WorkoutTab({ onMenuOpen }: Props) {
       {showAdd && !exLoading && (
         <AddSetModal
           exercises={exercises}
+          date={date}
+          initialExerciseId={prefillExerciseId}
           onAdd={async params => {
             const ok = await addSet(params);
             return ok;
           }}
-          onClose={() => setShowAdd(false)}
+          onClose={() => { setShowAdd(false); setPrefillExerciseId(null); }}
         />
       )}
     </>

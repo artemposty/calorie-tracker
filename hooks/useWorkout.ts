@@ -208,6 +208,46 @@ export function useWorkoutTonnageByDate(from: string, to: string): Record<string
   return byDate;
 }
 
+/** Info about the most recent workout strictly before the given date — for empty-day context. */
+export function useLastWorkoutInfo(beforeDate: string) {
+  const [info, setInfo] = useState<{ date: string; muscles: string[]; totalSets: number } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data: latest } = await supabase
+        .from('workout_sets')
+        .select('date')
+        .eq('user_id', USER_ID)
+        .lt('date', beforeDate)
+        .order('date', { ascending: false })
+        .limit(1);
+
+      if (!latest || latest.length === 0) { setInfo(null); return; }
+      const d = latest[0].date as string;
+
+      const { data: sets } = await supabase
+        .from('workout_sets')
+        .select('exercise_id')
+        .eq('user_id', USER_ID)
+        .eq('date', d);
+
+      const ids = [...new Set((sets ?? []).map(s => s.exercise_id as string))];
+      let muscles: string[] = [];
+      if (ids.length > 0) {
+        const { data: ex } = await supabase
+          .from('exercises')
+          .select('primary_muscle')
+          .in('id', ids)
+          .eq('user_id', USER_ID);
+        muscles = [...new Set((ex ?? []).map(r => r.primary_muscle as string))];
+      }
+      setInfo({ date: d, muscles, totalSets: (sets ?? []).length });
+    })();
+  }, [beforeDate]);
+
+  return info;
+}
+
 export function useLastSession(exerciseId: string | null) {
   const [session, setSession] = useState<{ date: string; sets: { weight: number; reps: number; rpe?: number }[] } | null>(null);
 

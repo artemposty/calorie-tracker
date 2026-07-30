@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Exercise } from '@/lib/types';
 import { haptic } from '@/lib/haptics';
 import { supabase, USER_ID } from '@/lib/supabase';
@@ -21,6 +21,10 @@ type Session = { date: string; sets: { weight: number; reps: number; rpe: number
 
 interface Props {
   exercises: Exercise[];
+  /** The date sets are being logged to (WorkoutTab's selected day). */
+  date: string;
+  /** When set, the picker is skipped — log view opens on this exercise, prefilled. */
+  initialExerciseId?: string | null;
   onAdd: (params: { exerciseId: string; weight: number; reps: number; rpe: number }) => Promise<boolean>;
   onClose: () => void;
 }
@@ -37,13 +41,24 @@ function fmtDate(dateStr: string): string {
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
-export function AddSetModal({ exercises, onAdd, onClose }: Props) {
+function epley(w: number, r: number) {
+  return Math.round(w * (1 + r / 30) * 10) / 10;
+}
+
+const STEP_BTN =
+  'flex items-center justify-center rounded-[14px] shrink-0 active:scale-[0.92] transition-transform duration-150 ease-out';
+const STEP_BTN_STYLE: React.CSSProperties = {
+  width: 52, height: 52,
+  background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+  color: 'var(--text-1)', fontSize: 20, fontWeight: 500,
+};
+
+export function AddSetModal({ exercises, date, initialExerciseId, onAdd, onClose }: Props) {
   // Picker
   const [pickerView, setPickerView] = useState<'groups' | 'exercises'>('groups');
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [freq, setFreq] = useState<Record<string, number>>({});
-  const [recentIds, setRecentIds] = useState<string[]>([]);
 
   // Log
   const [step, setStep] = useState<'pick' | 'log'>('pick');
@@ -56,30 +71,21 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
   const [prevSessions, setPrevSessions] = useState<Session[]>([]);
   const [histLoading, setHistLoading] = useState(false);
   const [prevBestE1rm, setPrevBestE1rm] = useState(0);
+  const openedPrefilled = useRef(false);
 
-  // Fetch frequency + recent on mount
+  // Fetch usage frequency on mount (sorts group lists by most-used)
   useEffect(() => {
     (async () => {
       const { data } = await supabase
         .from('workout_sets')
-        .select('exercise_id, date')
-        .eq('user_id', USER_ID)
-        .order('date', { ascending: false });
-
+        .select('exercise_id')
+        .eq('user_id', USER_ID);
       const freqMap: Record<string, number> = {};
-      const seen = new Set<string>();
-      const recent: string[] = [];
-
       for (const r of data ?? []) {
         const id = r.exercise_id as string;
         freqMap[id] = (freqMap[id] ?? 0) + 1;
-        if (!seen.has(id) && recent.length < 7) {
-          seen.add(id);
-          recent.push(id);
-        }
       }
       setFreq(freqMap);
-      setRecentIds(recent);
     })();
   }, []);
 
@@ -97,7 +103,6 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
       .order('date', { ascending: false })
       .order('created_at', { ascending: true });
 
-    // Group by date, display up to 4 sessions; compute all-time best e1RM
     const byDate: Record<string, { weight: number; reps: number; rpe: number }[]> = {};
     const dateOrder: string[] = [];
     let best = 0;
@@ -108,20 +113,15 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
       const rep = r.reps as number;
       const e1rm = w * (1 + rep / 30);
       if (e1rm > best) best = e1rm;
-
-      if (!byDate[d]) {
-        dateOrder.push(d);
-        byDate[d] = [];
-      }
+      if (!byDate[d]) { dateOrder.push(d); byDate[d] = []; }
       byDate[d].push({ weight: w, reps: rep, rpe: Number(r.rpe ?? 0) });
     }
 
     setPrevBestE1rm(best);
-    const displayDates = dateOrder.slice(0, 4);
-    const sessions = displayDates.map(date => ({ date, sets: byDate[date] }));
+    const sessions = dateOrder.slice(0, 5).map(d => ({ date: d, sets: byDate[d] }));
     setPrevSessions(sessions);
 
-    // Pre-fill from most recent set
+    // Prefill from the most recent set (today's last if the session is ongoing)
     if (sessions.length > 0 && sessions[0].sets.length > 0) {
       const last = sessions[0].sets[sessions[0].sets.length - 1];
       setWeight(String(last.weight));
@@ -131,12 +131,34 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
     setHistLoading(false);
   }
 
+  // "+ подход" entry point: skip the picker entirely
+  useEffect(() => {
+    if (openedPrefilled.current || !initialExerciseId) return;
+    const ex = exercises.find(e => e.id === initialExerciseId);
+    if (ex) {
+      openedPrefilled.current = true;
+      handleSelectExercise(ex);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialExerciseId, exercises]);
+
   function goBack() {
     haptic('light');
     setSelectedExercise(null);
     setWeight(''); setReps(''); setRpe('');
     setPrevSessions([]); setPrevBestE1rm(0);
     setStep('pick');
+  }
+
+  function stepWeight(delta: number) {
+    haptic('light');
+    const w = parseFloat(weight) || 0;
+    setWeight(String(Math.max(0, Math.round((w + delta) * 10) / 10)));
+  }
+  function stepReps(delta: number) {
+    haptic('light');
+    const r = parseInt(reps) || 0;
+    setReps(String(Math.max(1, r + delta)));
   }
 
   async function handleAdd() {
@@ -154,17 +176,23 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
 
     if (ok) {
       if (isNewPr) { haptic('heavy'); setPrToast(true); setTimeout(() => setPrToast(false), 2500); }
-      setWeight(''); setReps(''); setRpe('');
       if (e1rm > prevBestE1rm) setPrevBestE1rm(e1rm);
+      // Values stay for the next set (same weight is the common case);
+      // append to the current session so the chips update without a refetch.
+      setPrevSessions(prev => {
+        const set = { weight: w, reps: r, rpe: Number(rpe) };
+        const idx = prev.findIndex(s => s.date === date);
+        if (idx >= 0) {
+          const next = prev.slice();
+          next[idx] = { ...next[idx], sets: [...next[idx].sets, set] };
+          return next;
+        }
+        return [{ date, sets: [set] }, ...prev];
+      });
     }
   }
 
   // Derived
-  const recentExercises = useMemo(() =>
-    recentIds.map(id => exercises.find(e => e.id === id)).filter(Boolean) as Exercise[],
-    [recentIds, exercises]
-  );
-
   const muscleGroups = useMemo(() =>
     Object.entries(MUSCLE_LABELS)
       .map(([key, label]) => ({ key, label, count: exercises.filter(e => e.primaryMuscle === key).length }))
@@ -188,6 +216,15 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
   }, [exercises, search, freq]);
 
   const isSearching = search.trim().length > 0;
+
+  const currentSession = prevSessions.find(s => s.date === date) ?? null;
+  const historySessions = prevSessions.filter(s => s.date !== date);
+
+  // Live e1RM readout
+  const wNum = parseFloat(weight);
+  const rNum = parseInt(reps);
+  const liveE1rm = !isNaN(wNum) && wNum > 0 && !isNaN(rNum) && rNum > 0 ? epley(wNum, rNum) : null;
+  const isPrPreview = liveE1rm !== null && prevBestE1rm > 0 && liveE1rm > Math.round(prevBestE1rm * 10) / 10;
 
   let headerTitle = 'Выбери упражнение';
   if (step === 'log') headerTitle = selectedExercise?.name ?? '';
@@ -230,9 +267,14 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
               </svg>
             </button>
           )}
-          <p className="text-base font-semibold flex-1 truncate" style={{ color: 'var(--text-1)' }}>
-            {headerTitle}
-          </p>
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-semibold truncate" style={{ color: 'var(--text-1)' }}>{headerTitle}</p>
+            {step === 'log' && selectedExercise && (
+              <p className="text-[11px] truncate" style={{ color: 'var(--text-3)' }}>
+                {MUSCLE_LABELS[selectedExercise.primaryMuscle]} · {EQUIPMENT_LABELS[selectedExercise.equipment] ?? selectedExercise.equipment}
+              </p>
+            )}
+          </div>
           <button onClick={onClose} style={{ color: 'var(--text-3)', padding: 4 }}>
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -256,7 +298,6 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
 
             <div className="overflow-y-auto flex-1 pb-2 flex flex-col gap-4">
               {isSearching ? (
-                // Search results
                 <div className="px-4">
                   {searchResults.length === 0 ? (
                     <p className="text-sm text-center py-8" style={{ color: 'var(--text-3)' }}>Ничего не найдено</p>
@@ -285,29 +326,25 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
                   )}
                 </div>
               ) : pickerView === 'groups' ? (
-                <>
-                  {/* Muscle group grid */}
-                  <div className="px-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-4)' }}>
-                      Группы мышц
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {muscleGroups.map(g => (
-                        <button
-                          key={g.key}
-                          className="flex flex-col gap-1 p-4 rounded-2xl text-left active:opacity-60"
-                          style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
-                          onClick={() => { haptic('light'); setActiveGroup(g.key); setPickerView('exercises'); }}
-                        >
-                          <span className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>{g.label}</span>
-                          <span className="text-xs" style={{ color: 'var(--text-4)' }}>{g.count} упр.</span>
-                        </button>
-                      ))}
-                    </div>
+                <div className="px-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-4)' }}>
+                    Группы мышц
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {muscleGroups.map(g => (
+                      <button
+                        key={g.key}
+                        className="flex flex-col gap-1 p-4 rounded-2xl text-left active:opacity-60"
+                        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
+                        onClick={() => { haptic('light'); setActiveGroup(g.key); setPickerView('exercises'); }}
+                      >
+                        <span className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>{g.label}</span>
+                        <span className="text-xs" style={{ color: 'var(--text-4)' }}>{g.count} упр.</span>
+                      </button>
+                    ))}
                   </div>
-                </>
+                </div>
               ) : (
-                // Exercise list for a muscle group
                 <div className="px-4">
                   {groupExercises.length === 0 ? (
                     <p className="text-sm text-center py-8" style={{ color: 'var(--text-3)' }}>Нет упражнений</p>
@@ -344,48 +381,90 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
         {step === 'log' && (
           <div className="flex flex-col overflow-y-auto flex-1">
             <div className="px-4 flex flex-col gap-4 pb-4">
-              {/* Weight + Reps */}
-              <div className="flex gap-3">
-                <div className="flex-1 flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>Вес (кг)</label>
+
+              {/* Current session so far */}
+              {currentSession && currentSession.sets.length > 0 && (
+                <div>
+                  <p className="text-[10.5px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-4)' }}>
+                    {fmtDate(date)} · {currentSession.sets.length} подх.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {currentSession.sets.map((s, i) => (
+                      <button
+                        key={i}
+                        className="text-xs px-2.5 py-1 rounded-lg active:opacity-60 tabular-nums"
+                        style={{ background: 'var(--bg-elevated)', color: 'var(--text-2)', border: '1px solid var(--border)' }}
+                        onClick={() => { haptic('light'); setWeight(String(s.weight)); setReps(String(s.reps)); if (s.rpe) setRpe(String(s.rpe)); }}
+                      >
+                        {s.weight}×{s.reps}{s.rpe ? ` @${s.rpe}` : ''}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Weight: stepper + keyboard-editable value */}
+              <div className="flex items-center gap-2.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wide shrink-0" style={{ color: 'var(--text-3)', width: 44 }}>Вес</span>
+                <button className={STEP_BTN} style={STEP_BTN_STYLE} onClick={() => stepWeight(-2.5)}>−</button>
+                <div className="flex-1 flex flex-col items-center">
                   <input
                     type="number" inputMode="decimal" placeholder="0" value={weight}
                     onChange={e => setWeight(e.target.value)}
-                    className="w-full text-center text-2xl font-bold rounded-xl py-4 outline-none"
-                    style={{ background: 'var(--bg-elevated)', color: 'var(--text-1)', border: '1px solid var(--border)' }}
+                    className="w-full text-center rounded-xl outline-none tabular-nums"
+                    style={{ background: 'transparent', color: 'var(--text-1)', fontSize: 34, fontWeight: 200, letterSpacing: '-0.03em', border: 'none' }}
                   />
+                  <span className="text-[10px]" style={{ color: 'var(--text-4)' }}>кг · шаг 2.5</span>
                 </div>
-                <div className="flex-1 flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>Повторения</label>
+                <button className={STEP_BTN} style={STEP_BTN_STYLE} onClick={() => stepWeight(2.5)}>+</button>
+              </div>
+
+              {/* Reps */}
+              <div className="flex items-center gap-2.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wide shrink-0" style={{ color: 'var(--text-3)', width: 44 }}>Повт.</span>
+                <button className={STEP_BTN} style={STEP_BTN_STYLE} onClick={() => stepReps(-1)}>−</button>
+                <div className="flex-1 flex flex-col items-center">
                   <input
                     type="number" inputMode="numeric" placeholder="0" value={reps}
                     onChange={e => setReps(e.target.value)}
-                    className="w-full text-center text-2xl font-bold rounded-xl py-4 outline-none"
-                    style={{ background: 'var(--bg-elevated)', color: 'var(--text-1)', border: '1px solid var(--border)' }}
+                    className="w-full text-center rounded-xl outline-none tabular-nums"
+                    style={{ background: 'transparent', color: 'var(--text-1)', fontSize: 34, fontWeight: 200, letterSpacing: '-0.03em', border: 'none' }}
                   />
+                  <span className="text-[10px]" style={{ color: 'var(--text-4)' }}>повторений</span>
                 </div>
+                <button className={STEP_BTN} style={STEP_BTN_STYLE} onClick={() => stepReps(1)}>+</button>
               </div>
 
               {/* RPE */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold" style={{ color: 'var(--text-3)' }}>RPE</label>
-                <div className="flex gap-1.5 flex-wrap">
-                  {[6, 7, 7.5, 8, 8.5, 9, 9.5, 10].map(v => (
-                    <button
-                      key={v}
-                      onClick={() => { haptic('light'); setRpe(rpe === String(v) ? '' : String(v)); }}
-                      className="text-sm font-semibold px-3 py-2 rounded-lg active:opacity-60 transition-colors"
-                      style={{
-                        background: rpe === String(v) ? 'var(--text-1)' : 'var(--bg-elevated)',
-                        color: rpe === String(v) ? 'var(--bg)' : 'var(--text-2)',
-                        border: '1px solid var(--border)',
-                      }}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex gap-1.5 flex-wrap">
+                {[6, 7, 7.5, 8, 8.5, 9, 9.5, 10].map(v => (
+                  <button
+                    key={v}
+                    onClick={() => { haptic('light'); setRpe(rpe === String(v) ? '' : String(v)); }}
+                    className="flex-1 text-sm font-semibold py-2 rounded-[10px] active:opacity-60 transition-colors tabular-nums"
+                    style={{
+                      minWidth: 34,
+                      background: rpe === String(v) ? 'var(--text-1)' : 'var(--bg-elevated)',
+                      color: rpe === String(v) ? 'var(--bg)' : 'var(--text-2)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    {v}
+                  </button>
+                ))}
               </div>
+
+              {/* Live e1RM + PR preview */}
+              {liveE1rm !== null && (
+                <p
+                  className="text-center text-xs tabular-nums"
+                  style={{ color: isPrPreview ? 'var(--success)' : 'var(--text-3)', fontWeight: isPrPreview ? 650 : 400 }}
+                >
+                  {isPrPreview
+                    ? <>🏆 e1RM {liveE1rm} кг — будет новый рекорд (лучший {Math.round(prevBestE1rm * 10) / 10})</>
+                    : <>e1RM {liveE1rm} кг{prevBestE1rm > 0 ? <span style={{ color: 'var(--text-4)' }}> · рекорд {Math.round(prevBestE1rm * 10) / 10} кг</span> : null}</>}
+                </p>
+              )}
 
               {/* Add button */}
               <button
@@ -400,12 +479,12 @@ export function AddSetModal({ exercises, onAdd, onClose }: Props) {
               {/* Previous sessions */}
               {histLoading ? (
                 <div className="skeleton h-16 rounded-xl" />
-              ) : prevSessions.length > 0 && (
+              ) : historySessions.length > 0 && (
                 <div className="flex flex-col gap-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-4)' }}>
+                  <p className="text-[10.5px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-4)' }}>
                     История
                   </p>
-                  {prevSessions.map(session => (
+                  {historySessions.map(session => (
                     <div key={session.date}>
                       <p className="text-xs mb-1.5" style={{ color: 'var(--text-3)' }}>
                         {fmtDate(session.date)} · <span style={{ color: 'var(--text-4)' }}>{session.sets.length} подх.</span>

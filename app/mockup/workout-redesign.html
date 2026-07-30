@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Модуль тренировок v2 — «+ подход» с префиллом и новый экран логирования</title>
+<style>
+  :root {
+    --chrome-bg: #f2f1ee; --chrome-bg-2: #ffffff; --chrome-text: #17171a;
+    --chrome-text-2: #63636b; --chrome-text-3: #97979e; --chrome-border: #e3e2de;
+    --chrome-accent: #ff375f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --chrome-bg:#0d0d0f; --chrome-bg-2:#17171a; --chrome-text:#f2f2f3; --chrome-text-2:#9d9da4; --chrome-text-3:#6b6b72; --chrome-border:#232327; }
+  }
+  :root[data-theme="dark"]  { --chrome-bg:#0d0d0f; --chrome-bg-2:#17171a; --chrome-text:#f2f2f3; --chrome-text-2:#9d9da4; --chrome-text-3:#6b6b72; --chrome-border:#232327; }
+  :root[data-theme="light"] { --chrome-bg:#f2f1ee; --chrome-bg-2:#ffffff; --chrome-text:#17171a; --chrome-text-2:#63636b; --chrome-text-3:#97979e; --chrome-border:#e3e2de; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--chrome-bg); color: var(--chrome-text); font-family: system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+  body { overflow-x: hidden; }
+
+  .page { max-width: 1180px; margin: 0 auto; padding: 48px 24px 80px; display: flex; flex-direction: column; gap: 40px; }
+  .intro { max-width: 660px; display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--chrome-accent); }
+  h1 { font-size: 27px; font-weight: 650; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+  .intro p { font-size: 15px; line-height: 1.55; color: var(--chrome-text-2); margin: 0; text-wrap: pretty; }
+
+  .layout { display: flex; gap: 48px; align-items: flex-start; flex-wrap: wrap; }
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; flex-shrink: 0; }
+  .phone-caption { font-size: 12px; color: var(--chrome-text-3); font-weight: 600; text-align: center; }
+  .phone { width: 375px; height: 780px; border-radius: 46px; background: #050506; padding: 12px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 30px 60px -20px rgba(0,0,0,0.5); position: relative; }
+  .phone-screen { width: 100%; height: 100%; border-radius: 36px; overflow: hidden; position: relative; background: #0a0a0b; }
+  .notch { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 100px; height: 26px; border-radius: 14px; background: #000; z-index: 50; }
+
+  .phone-screen {
+    --bg: #0a0a0b; --bg-card: #16161a; --bg-elevated: #1c1c20; --border: #26262d; --border-sub: #1f1f24;
+    --text-1: #f4f4f5; --text-2: #a1a1aa; --text-3: #71717a; --text-4: #3f3f46;
+    --success: #30d158; --danger: #ff453a;
+    font-family: system-ui, -apple-system, "SF Pro Display", "SF Pro Text", sans-serif;
+    display: flex; flex-direction: column;
+  }
+  .app-content { flex: 1; overflow-y: auto; padding-bottom: 120px; }
+  .app-content::-webkit-scrollbar { display: none; }
+
+  .app-header { display: flex; align-items: center; justify-content: space-between; padding: 44px 18px 6px; }
+  .menu-btn { width: 36px; height: 36px; border-radius: 18px; background: var(--bg-card); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
+  .header-date { display: flex; flex-direction: column; align-items: center; }
+  .header-date .weekday { font-size: 15px; font-weight: 650; color: var(--text-1); }
+  .header-date .full { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .header-spacer { width: 36px; }
+
+  .week-strip-outer { padding: 8px 0 4px; overflow: hidden; touch-action: pan-y; }
+  .week-days { display: flex; justify-content: space-between; gap: 3px; padding: 0 12px; }
+  .day-cell { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 7px 2px 8px; border-radius: 14px; cursor: pointer; border: 1px solid transparent; }
+  .day-cell.selected { background: var(--bg-elevated); border-color: var(--border); }
+  .day-cell .wd { font-size: 10px; font-weight: 700; color: var(--text-4); text-transform: uppercase; }
+  .day-cell.selected .wd { color: var(--text-2); }
+  .day-cell .bar-track { width: 5px; height: 22px; border-radius: 3px; background: rgba(255,255,255,0.06); display: flex; align-items: flex-end; overflow: hidden; }
+  .day-cell .bar-fill { width: 100%; border-radius: 3px; }
+  .day-cell .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-1); opacity: 0; margin-top: -1px; }
+  .day-cell.today .dot { opacity: 1; }
+  .day-cell.disabled { opacity: 0.35; cursor: default; }
+
+  .summary-line { text-align: center; font-size: 12px; color: var(--text-3); padding: 6px 0 2px; font-variant-numeric: tabular-nums; }
+  .summary-line b { color: var(--text-1); font-weight: 650; }
+
+  .ex-section { margin: 12px 16px 0; display: flex; flex-direction: column; gap: 12px; }
+  .ex-card { border-radius: 16px; border: 1px solid var(--border); overflow: hidden; }
+  .ex-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--bg-elevated); }
+  .ex-name { font-size: 13.5px; font-weight: 650; color: var(--text-1); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .add-set-btn {
+    display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 9px; border: none;
+    background: rgba(255,255,255,0.08); color: var(--text-1); font-size: 11px; font-weight: 700;
+    cursor: pointer; font-family: inherit; transition: transform 150ms ease-out; flex-shrink: 0;
+  }
+  .add-set-btn:active { transform: scale(0.94); }
+  .set-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg-card); }
+  .set-row + .set-row { border-top: 1px solid var(--border-sub); }
+  .set-row.flash { animation: setFlash 600ms ease-out; }
+  @keyframes setFlash { 0% { background: rgba(48,209,88,0.18); } 100% { background: var(--bg-card); } }
+  .set-idx { font-size: 11px; font-weight: 700; color: var(--text-4); width: 14px; text-align: right; font-variant-numeric: tabular-nums; }
+  .set-main { flex: 1; font-size: 13.5px; font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
+  .set-rpe { font-size: 11px; color: var(--text-3); }
+  .set-e1rm { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+  .vol-card { margin: 14px 16px 0; border-radius: 16px; background: var(--bg-card); border: 1px solid var(--border); padding: 16px; }
+  .vol-card .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-4); margin-bottom: 12px; }
+  .vol-row { margin-bottom: 11px; }
+  .vol-row:last-child { margin-bottom: 0; }
+  .vol-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .vol-name { font-size: 12px; font-weight: 500; color: var(--text-2); }
+  .vol-val { font-size: 11px; font-variant-numeric: tabular-nums; }
+  .vol-track { position: relative; height: 6px; border-radius: 3px; background: var(--bg-elevated); overflow: hidden; }
+  .vol-zone { position: absolute; top: 0; bottom: 0; background: rgba(255,255,255,0.07); }
+  .vol-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 3px; }
+
+  .fab { position: absolute; right: 18px; bottom: 92px; width: 50px; height: 50px; border-radius: 25px; background: #fff; border: none; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(0,0,0,0.5); z-index: 20; cursor: pointer; transition: transform 150ms ease-out; }
+  .fab:active { transform: scale(0.94); }
+  .tabbar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; background: var(--bg-card); border-top: 1px solid var(--border); padding: 8px 0 22px; z-index: 20; }
+  .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .tab-item .lbl { font-size: 10px; font-weight: 500; }
+
+  /* ── Add-set sheet ───────────────────────────────────────────────── */
+  .sheet-backdrop {
+    position: absolute; inset: 0; z-index: 30; background: rgba(0,0,0,0.7);
+    opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+  }
+  .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 31;
+    background: var(--bg-card); border-radius: 24px 24px 0 0; border: 1px solid var(--border); border-bottom: none;
+    max-height: 88%; display: flex; flex-direction: column;
+    transform: translateY(105%); transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .sheet.open { transform: translateY(0); }
+  .sheet-handle { display: flex; justify-content: center; padding: 10px 0 4px; }
+  .sheet-handle span { width: 36px; height: 4px; border-radius: 2px; background: var(--bg-elevated); }
+  .sheet-head { display: flex; align-items: center; gap: 10px; padding: 6px 18px 12px; }
+  .sheet-back { width: 30px; height: 30px; border-radius: 15px; border: none; background: var(--bg-elevated); color: var(--text-2); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+  .sheet-title { flex: 1; min-width: 0; }
+  .sheet-title .t { font-size: 15px; font-weight: 650; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sheet-title .s { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .sheet-body { flex: 1; overflow-y: auto; padding: 0 18px 24px; }
+  .sheet-body::-webkit-scrollbar { display: none; }
+
+  /* Picker */
+  .grp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grp-cell { padding: 14px; border-radius: 14px; background: var(--bg-elevated); border: 1px solid var(--border); text-align: left; cursor: pointer; font-family: inherit; }
+  .grp-cell .n { font-size: 13.5px; font-weight: 650; color: var(--text-1); }
+  .grp-cell .c { font-size: 11px; color: var(--text-4); margin-top: 2px; }
+  .ex-list { display: flex; flex-direction: column; border-radius: 14px; border: 1px solid var(--border); overflow: hidden; }
+  .ex-list-row { display: flex; align-items: center; justify-content: space-between; padding: 13px 14px; background: var(--bg-card); border: none; cursor: pointer; font-family: inherit; text-align: left; width: 100%; }
+  .ex-list-row + .ex-list-row { border-top: 1px solid var(--border-sub); }
+  .ex-list-row .n { font-size: 13.5px; font-weight: 600; color: var(--text-1); }
+  .ex-list-row .m { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+
+  /* Log view */
+  .today-so-far { margin-bottom: 14px; }
+  .today-so-far .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-4); margin-bottom: 7px; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .set-chip {
+    padding: 4px 10px; border-radius: 9px; background: var(--bg-elevated); border: 1px solid var(--border);
+    font-size: 11.5px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums;
+  }
+  .set-chip.new { animation: chipIn 400ms cubic-bezier(0.2,0,0,1); border-color: rgba(48,209,88,0.4); color: var(--success); }
+  @keyframes chipIn { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: scale(1); } }
+
+  .ctrl { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .ctrl-label { width: 44px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); flex-shrink: 0; }
+  .ctrl-btn {
+    width: 52px; height: 52px; border-radius: 14px; border: 1px solid var(--border);
+    background: var(--bg-elevated); color: var(--text-1); font-size: 20px; font-weight: 500;
+    cursor: pointer; font-family: inherit; flex-shrink: 0; transition: transform 120ms ease-out;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ctrl-btn:active { transform: scale(0.92); }
+  .ctrl-val { flex: 1; text-align: center; }
+  .ctrl-val .v { font-size: 34px; font-weight: 200; letter-spacing: -0.03em; color: var(--text-1); font-variant-numeric: tabular-nums; line-height: 1; }
+  .ctrl-val .u { font-size: 11px; color: var(--text-4); margin-top: 3px; }
+
+  .rpe-row { display: flex; gap: 5px; flex-wrap: wrap; margin: 4px 0 14px; }
+  .rpe-chip {
+    flex: 1; min-width: 34px; padding: 9px 0; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg-elevated); color: var(--text-2); font-size: 12.5px; font-weight: 650;
+    cursor: pointer; font-family: inherit; text-align: center; font-variant-numeric: tabular-nums;
+  }
+  .rpe-chip.active { background: #fff; color: #0a0a0b; border-color: #fff; }
+
+  .e1rm-line {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; margin-bottom: 14px;
+  }
+  .e1rm-line.pr { color: var(--success); font-weight: 650; }
+
+  .log-add-btn {
+    width: 100%; padding: 15px 0; border-radius: 14px; border: none;
+    background: #fff; color: #0a0a0b; font-size: 14px; font-weight: 700; cursor: pointer;
+    font-family: inherit; transition: transform 150ms ease-out, background 0.25s, color 0.25s;
+  }
+  .log-add-btn:active { transform: scale(0.97); }
+  .log-add-btn.done { background: var(--success); color: #fff; }
+
+  .hist { margin-top: 18px; }
+  .hist .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-4); margin-bottom: 8px; }
+  .hist-sess { margin-bottom: 10px; }
+  .hist-date { font-size: 11px; color: var(--text-3); margin-bottom: 5px; font-variant-numeric: tabular-nums; }
+
+  /* Logic panel */
+  .logic-panel { flex: 1; min-width: 320px; max-width: 560px; display: flex; flex-direction: column; gap: 22px; }
+  .logic-card { background: var(--chrome-bg-2); border: 1px solid var(--chrome-border); border-radius: 16px; padding: 20px 22px; }
+  .logic-card h3 { font-size: 13px; font-weight: 700; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .logic-num { width: 20px; height: 20px; border-radius: 6px; background: var(--chrome-accent); color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .logic-card p { font-size: 13.5px; line-height: 1.6; color: var(--chrome-text-2); margin: 0 0 8px; }
+  .logic-card p:last-child { margin-bottom: 0; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; background: var(--chrome-border); padding: 1px 6px; border-radius: 5px; color: var(--chrome-text); }
+
+  @media (max-width: 860px) { .layout { justify-content: center; } .phone { width: 340px; height: 710px; } }
+  @media (max-width: 400px) { .phone { width: 300px; height: 630px; } }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="intro">
+    <p class="eyebrow">Мокап v2 · Тренировки</p>
+    <h1>«+ подход» с префиллом и переработанный экран логирования</h1>
+    <p>
+      По фидбеку: тоннаж и ккал убраны (осталась одна тихая строка со счётчиками),
+      кнопка теперь «+ подход» и открывает экран логирования с префиллом последнего
+      подхода. Сам экран переработан: степперы вместо клавиатуры, живой e1RM
+      с индикатором рекорда, сегодняшние подходы прямо в форме.
+    </p>
+  </div>
+
+  <div class="layout">
+
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="notch"></div>
+          <div class="app-content">
+
+            <div class="app-header">
+              <div class="menu-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              </div>
+              <div class="header-date">
+                <span class="weekday">Сегодня</span>
+                <span class="full">30 июля</span>
+              </div>
+              <div class="header-spacer"></div>
+            </div>
+
+            <div class="week-strip-outer">
+              <div class="week-days" id="weekDays"></div>
+            </div>
+
+            <p class="summary-line" id="summaryLine"></p>
+
+            <div class="ex-section" id="exSection"></div>
+
+            <div class="vol-card">
+              <p class="lbl">Объём за 7 дней · целевые диапазоны</p>
+              <div id="volRows"></div>
+            </div>
+
+          </div>
+
+          <button class="fab" id="fabBtn" aria-label="Добавить подход">
+            <svg width="22" height="22" fill="none" stroke="#0a0a0b" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke-linecap="round"/></svg>
+          </button>
+          <div class="tabbar">
+            <div class="tab-item" style="color:#f4f4f5;">
+              <svg width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span class="lbl">Сегодня</span>
+            </div>
+            <div class="tab-item" style="color:#3f3f46;">
+              <svg width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6.5 6.5h11M6.5 17.5h11M3 12h2m14 0h2M5 9.5l-2 2.5 2 2.5M19 9.5l2 2.5-2 2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="lbl">Упражнения</span>
+            </div>
+            <div class="tab-item" style="color:#3f3f46;">
+              <svg width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>
+              <span class="lbl">Статистика</span>
+            </div>
+          </div>
+
+          <!-- Add-set sheet -->
+          <div class="sheet-backdrop" id="sheetBackdrop"></div>
+          <div class="sheet" id="sheet">
+            <div class="sheet-handle"><span></span></div>
+            <div class="sheet-head">
+              <button class="sheet-back" id="sheetBack">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <div class="sheet-title">
+                <p class="t" id="sheetTitle">Выбери упражнение</p>
+                <p class="s" id="sheetSub"></p>
+              </div>
+            </div>
+            <div class="sheet-body" id="sheetBody"></div>
+          </div>
+
+        </div>
+      </div>
+      <p class="phone-caption">тапни «+ подход» на упражнении или FAB внизу</p>
+    </div>
+
+    <div class="logic-panel">
+
+      <div class="logic-card">
+        <h3><span class="logic-num">1</span>«+ подход» = модалка с префиллом</h3>
+        <p>
+          Кнопка на карточке упражнения открывает экран логирования сразу на этом
+          упражнении, с весом × повторами × RPE последнего подхода. Не мгновенная
+          запись — можно поправить перед добавлением. FAB работает как раньше:
+          выбор упражнения → логирование (тоже с префиллом последнего исторического
+          подхода этого упражнения).
+        </p>
+      </div>
+
+      <div class="logic-card">
+        <h3><span class="logic-num">2</span>Степперы вместо клавиатуры</h3>
+        <p>
+          Вес: ±2.5 кг (шаг блина), повторы: ±1 — крупные 52px-кнопки, в зал
+          с клавиатурой неудобно. Тап по самому числу открывает обычный ввод для
+          нестандартных значений. RPE — те же чипы, что сейчас.
+        </p>
+      </div>
+
+      <div class="logic-card">
+        <h3><span class="logic-num">3</span>Живой e1RM и индикатор рекорда</h3>
+        <p>
+          Под контролами — расчётный e1RM для текущих вес×повторы и лучший
+          исторический. Как только комбинация превышает рекорд, строка становится
+          зелёной: «🏆 будет новый рекорд» — видно ДО того как записал подход.
+          Попробуй поднять вес до 90 кг на жиме.
+        </p>
+      </div>
+
+      <div class="logic-card">
+        <h3><span class="logic-num">4</span>Сегодняшние подходы — в форме</h3>
+        <p>
+          Чипы подходов текущей сессии прямо над контролами: записал → чип появился
+          с зелёной вспышкой, счёт виден без закрытия модалки. История прошлых
+          тренировок — ниже, как сейчас (чипы по датам, тап подставляет значения).
+        </p>
+      </div>
+
+      <div class="logic-card">
+        <h3><span class="logic-num">5</span>Таб «Сегодня» — тише</h3>
+        <p>
+          Hero с тоннажем и ккал убран. Одна строка «7 подходов · 3 упражнения» под
+          полоской недели — и сразу упражнения. Полоска недели и объём с диапазонами —
+          как в прошлом мокапе (одобрено). Удаление подхода — свайп с подтверждением,
+          как в еде.
+        </p>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  const TODAY_IDX = 2;
+  const WEEK_TONNAGE = [11200, 0, 1, null, null, null, null];
+
+  const EXERCISES = [
+    { name: 'Жим штанги лёжа', muscle: 'Грудь · Штанга', bestE1rm: 104.9,
+      sets: [ {w:80,r:8,rpe:8}, {w:80,r:8,rpe:8.5}, {w:80,r:7,rpe:9} ],
+      history: [ { date: '2 дн. назад', sets: ['80×8','80×8','77.5×8'] }, { date: '5 дн. назад', sets: ['77.5×8','77.5×8','77.5×7'] } ] },
+    { name: 'Жим гантелей на наклонной', muscle: 'Грудь · Гантели', bestE1rm: 41.3,
+      sets: [ {w:30,r:10,rpe:8}, {w:30,r:9,rpe:8.5} ],
+      history: [ { date: '2 дн. назад', sets: ['30×10','30×9'] } ] },
+    { name: 'Разгибание на трицепс с канатом', muscle: 'Трицепс · Кабель', bestE1rm: 35.8,
+      sets: [ {w:25,r:12,rpe:8}, {w:25,r:12,rpe:9} ],
+      history: [ { date: '2 дн. назад', sets: ['25×12','25×12'] } ] },
+  ];
+
+  const PICKER_GROUPS = [
+    { name: 'Грудь', count: 6, items: [
+      { name: 'Жим штанги лёжа', muscle: 'Штанга', last: {w:80,r:8,rpe:8}, ref: 0 },
+      { name: 'Жим гантелей на наклонной', muscle: 'Гантели', last: {w:30,r:10,rpe:8}, ref: 1 },
+      { name: 'Сведение рук в кроссовере', muscle: 'Кабель', last: {w:20,r:12,rpe:8}, ref: -1 },
+    ]},
+    { name: 'Спина', count: 7, items: [
+      { name: 'Подтягивания', muscle: 'Вес тела', last: {w:0,r:10,rpe:8}, ref: -1 },
+      { name: 'Тяга верхнего блока', muscle: 'Кабель', last: {w:65,r:10,rpe:8}, ref: -1 },
+    ]},
+    { name: 'Ноги', count: 5, items: [
+      { name: 'Приседания со штангой', muscle: 'Штанга', last: {w:100,r:6,rpe:8.5}, ref: -1 },
+    ]},
+    { name: 'Плечи', count: 7, items: [
+      { name: 'Жим гантелей сидя', muscle: 'Гантели', last: {w:24,r:10,rpe:8}, ref: -1 },
+    ]},
+    { name: 'Трицепс', count: 5, items: [
+      { name: 'Разгибание на трицепс с канатом', muscle: 'Кабель', last: {w:25,r:12,rpe:8}, ref: 2 },
+    ]},
+    { name: 'Бицепс', count: 5, items: [
+      { name: 'Подъём штанги на бицепс', muscle: 'Штанга', last: {w:35,r:10,rpe:8}, ref: -1 },
+    ]},
+  ];
+
+  const VOLUME = [
+    { name: 'Грудь',   sets: 14, min: 10, max: 20 },
+    { name: 'Трицепс', sets: 9,  min: 8,  max: 16 },
+    { name: 'Спина',   sets: 6,  min: 10, max: 20 },
+  ];
+
+  const RPE_OPTS = [6, 7, 7.5, 8, 8.5, 9, 9.5, 10];
+
+  function epley(w, r) { return Math.round(w * (1 + r / 30) * 10) / 10; }
+
+  // ── Today screen ────────────────────────────────────────────────────
+  function renderWeek() {
+    const el = document.getElementById('weekDays');
+    const vals = WEEK_TONNAGE.map(function (t) { return t || 0; });
+    const maxT = Math.max.apply(null, vals.concat([1]));
+    el.innerHTML = '';
+    WEEKDAYS.forEach(function (wd, i) {
+      const t = WEEK_TONNAGE[i];
+      const isFuture = t === null;
+      const isToday = i === TODAY_IDX;
+      let dayT = t || 0;
+      if (isToday) { dayT = 0; EXERCISES.forEach(function (ex) { ex.sets.forEach(function (s) { dayT += s.w * s.r; }); }); }
+      const h = isFuture ? 8 : dayT === 0 ? 8 : Math.max(14, (dayT / Math.max(maxT, dayT)) * 100);
+      const color = isFuture ? 'rgba(255,255,255,0.08)' : dayT === 0 ? 'rgba(255,255,255,0.10)' : isToday ? '#f4f4f5' : 'rgba(222,226,255,0.65)';
+      const cell = document.createElement('div');
+      cell.className = 'day-cell' + (isToday ? ' selected today' : '') + (isFuture ? ' disabled' : '');
+      cell.innerHTML = '<span class="wd">' + wd + '</span>' +
+        '<div class="bar-track"><div class="bar-fill" style="height:' + h + '%; background:' + color + ';"></div></div>' +
+        '<span class="dot"></span>';
+      el.appendChild(cell);
+    });
+  }
+
+  function renderSummary() {
+    let sets = 0;
+    EXERCISES.forEach(function (ex) { sets += ex.sets.length; });
+    document.getElementById('summaryLine').innerHTML = '<b>' + sets + '</b> подходов · <b>' + EXERCISES.length + '</b> упражнения';
+  }
+
+  function renderExercises(flashLast) {
+    const el = document.getElementById('exSection');
+    el.innerHTML = EXERCISES.map(function (ex, xi) {
+      return '<div class="ex-card">' +
+        '<div class="ex-head">' +
+          '<span class="ex-name">' + ex.name + '</span>' +
+          '<button class="add-set-btn" data-add="' + xi + '">' +
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+            'подход' +
+          '</button>' +
+        '</div>' +
+        ex.sets.map(function (s, si) {
+          const isNew = flashLast === xi && si === ex.sets.length - 1;
+          return '<div class="set-row' + (isNew ? ' flash' : '') + '">' +
+            '<span class="set-idx">' + (si + 1) + '</span>' +
+            '<span class="set-main">' + s.w + ' кг × ' + s.r + ' <span class="set-rpe">@' + s.rpe + '</span></span>' +
+            '<span class="set-e1rm">e1RM ' + epley(s.w, s.r) + '</span>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }).join('');
+
+    el.querySelectorAll('[data-add]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openLogForExercise(Number(btn.getAttribute('data-add')));
+      });
+    });
+  }
+
+  function renderVolume() {
+    const el = document.getElementById('volRows');
+    const SCALE = 26;
+    el.innerHTML = VOLUME.map(function (v) {
+      const color = v.sets < v.min ? '#ff9f0a' : v.sets <= v.max ? '#30d158' : '#ff453a';
+      return '<div class="vol-row">' +
+        '<div class="vol-head"><span class="vol-name">' + v.name + '</span>' +
+        '<span class="vol-val" style="color:' + color + '">' + v.sets + ' <span style="color:var(--text-4)">/ ' + v.min + '–' + v.max + '</span></span></div>' +
+        '<div class="vol-track">' +
+          '<div class="vol-zone" style="left:' + (v.min / SCALE * 100) + '%; width:' + ((v.max - v.min) / SCALE * 100) + '%;"></div>' +
+          '<div class="vol-fill" style="width:' + Math.min(v.sets / SCALE * 100, 100) + '%; background:' + color + ';"></div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // ── Sheet ───────────────────────────────────────────────────────────
+  const sheet = document.getElementById('sheet');
+  const backdrop = document.getElementById('sheetBackdrop');
+  const sheetBody = document.getElementById('sheetBody');
+  const sheetTitle = document.getElementById('sheetTitle');
+  const sheetSub = document.getElementById('sheetSub');
+
+  let view = 'groups'; // groups | list | log
+  let activeGroup = null;
+  let log = null; // { exIdx, name, muscle, bestE1rm, w, r, rpe }
+
+  function openSheet() { sheet.classList.add('open'); backdrop.classList.add('open'); }
+  function closeSheet() { sheet.classList.remove('open'); backdrop.classList.remove('open'); }
+
+  function openPicker() { view = 'groups'; renderSheet(); openSheet(); }
+
+  function openLogForExercise(xi) {
+    const ex = EXERCISES[xi];
+    const last = ex.sets[ex.sets.length - 1];
+    log = { exIdx: xi, name: ex.name, muscle: ex.muscle, bestE1rm: ex.bestE1rm, w: last.w, r: last.r, rpe: last.rpe };
+    view = 'log';
+    renderSheet();
+    openSheet();
+  }
+
+  function openLogFromPicker(item) {
+    if (item.ref >= 0) { openLogForExercise(item.ref); return; }
+    log = { exIdx: -1, name: item.name, muscle: item.muscle, bestE1rm: epley(item.last.w, item.last.r) + 3, w: item.last.w, r: item.last.r, rpe: item.last.rpe };
+    view = 'log';
+    renderSheet();
+  }
+
+  function renderSheet() {
+    if (view === 'groups') {
+      sheetTitle.textContent = 'Выбери упражнение';
+      sheetSub.textContent = '';
+      sheetBody.innerHTML = '<div class="grp-grid">' + PICKER_GROUPS.map(function (g, gi) {
+        return '<button class="grp-cell" data-grp="' + gi + '"><div class="n">' + g.name + '</div><div class="c">' + g.count + ' упр.</div></button>';
+      }).join('') + '</div>';
+      sheetBody.querySelectorAll('[data-grp]').forEach(function (b) {
+        b.addEventListener('click', function () { activeGroup = Number(b.getAttribute('data-grp')); view = 'list'; renderSheet(); });
+      });
+    }
+
+    if (view === 'list') {
+      const g = PICKER_GROUPS[activeGroup];
+      sheetTitle.textContent = g.name;
+      sheetSub.textContent = '';
+      sheetBody.innerHTML = '<div class="ex-list">' + g.items.map(function (it, ii) {
+        return '<button class="ex-list-row" data-ex="' + ii + '"><span><span class="n">' + it.name + '</span><br/><span class="m">' + it.muscle + '</span></span>' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3f3f46" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>';
+      }).join('') + '</div>';
+      sheetBody.querySelectorAll('[data-ex]').forEach(function (b) {
+        b.addEventListener('click', function () { openLogFromPicker(g.items[Number(b.getAttribute('data-ex'))]); });
+      });
+    }
+
+    if (view === 'log') {
+      sheetTitle.textContent = log.name;
+      sheetSub.textContent = log.muscle;
+      const todaySets = log.exIdx >= 0 ? EXERCISES[log.exIdx].sets : [];
+      const hist = log.exIdx >= 0 ? EXERCISES[log.exIdx].history : [];
+
+      sheetBody.innerHTML =
+        (todaySets.length ? '<div class="today-so-far"><p class="lbl">Сегодня · ' + todaySets.length + ' подх.</p><div class="chip-row" id="todayChips">' +
+          todaySets.map(function (s) { return '<span class="set-chip">' + s.w + '×' + s.r + ' @' + s.rpe + '</span>'; }).join('') +
+        '</div></div>' : '') +
+        '<div class="ctrl">' +
+          '<span class="ctrl-label">Вес</span>' +
+          '<button class="ctrl-btn" data-wd>−</button>' +
+          '<div class="ctrl-val"><div class="v" id="wVal">' + log.w + '</div><div class="u">кг · шаг 2.5</div></div>' +
+          '<button class="ctrl-btn" data-wu>+</button>' +
+        '</div>' +
+        '<div class="ctrl">' +
+          '<span class="ctrl-label">Повт.</span>' +
+          '<button class="ctrl-btn" data-rd>−</button>' +
+          '<div class="ctrl-val"><div class="v" id="rVal">' + log.r + '</div><div class="u">повторений</div></div>' +
+          '<button class="ctrl-btn" data-ru>+</button>' +
+        '</div>' +
+        '<div class="rpe-row" id="rpeRow">' + RPE_OPTS.map(function (v) {
+          return '<button class="rpe-chip' + (v === log.rpe ? ' active' : '') + '" data-rpe="' + v + '">' + v + '</button>';
+        }).join('') + '</div>' +
+        '<div class="e1rm-line" id="e1rmLine"></div>' +
+        '<button class="log-add-btn" id="logAdd">Добавить подход</button>' +
+        (hist.length ? '<div class="hist"><p class="lbl">История</p>' + hist.map(function (h) {
+          return '<div class="hist-sess"><p class="hist-date">' + h.date + '</p><div class="chip-row">' +
+            h.sets.map(function (s) { return '<span class="set-chip">' + s + '</span>'; }).join('') + '</div></div>';
+        }).join('') + '</div>' : '');
+
+      function updE1rm() {
+        const e = epley(log.w, log.r);
+        const line = document.getElementById('e1rmLine');
+        if (e > log.bestE1rm) {
+          line.className = 'e1rm-line pr';
+          line.innerHTML = '🏆 e1RM ' + e + ' кг — будет новый рекорд (лучший ' + log.bestE1rm + ')';
+        } else {
+          line.className = 'e1rm-line';
+          line.innerHTML = 'e1RM ' + e + ' кг · рекорд ' + log.bestE1rm + ' кг';
+        }
+      }
+      updE1rm();
+
+      sheetBody.querySelector('[data-wd]').addEventListener('click', function () { log.w = Math.max(0, Math.round((log.w - 2.5) * 10) / 10); document.getElementById('wVal').textContent = log.w; updE1rm(); });
+      sheetBody.querySelector('[data-wu]').addEventListener('click', function () { log.w = Math.round((log.w + 2.5) * 10) / 10; document.getElementById('wVal').textContent = log.w; updE1rm(); });
+      sheetBody.querySelector('[data-rd]').addEventListener('click', function () { log.r = Math.max(1, log.r - 1); document.getElementById('rVal').textContent = log.r; updE1rm(); });
+      sheetBody.querySelector('[data-ru]').addEventListener('click', function () { log.r += 1; document.getElementById('rVal').textContent = log.r; updE1rm(); });
+      sheetBody.querySelectorAll('[data-rpe]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          log.rpe = Number(b.getAttribute('data-rpe'));
+          sheetBody.querySelectorAll('[data-rpe]').forEach(function (x) { x.classList.remove('active'); });
+          b.classList.add('active');
+        });
+      });
+
+      document.getElementById('logAdd').addEventListener('click', function () {
+        if (log.exIdx < 0) {
+          EXERCISES.push({ name: log.name, muscle: log.muscle, bestE1rm: log.bestE1rm, sets: [], history: [] });
+          log.exIdx = EXERCISES.length - 1;
+        }
+        EXERCISES[log.exIdx].sets.push({ w: log.w, r: log.r, rpe: log.rpe });
+        if (epley(log.w, log.r) > log.bestE1rm) log.bestE1rm = epley(log.w, log.r);
+        renderExercises(log.exIdx);
+        renderSummary();
+        renderWeek();
+        const btn = document.getElementById('logAdd');
+        btn.textContent = '✓ Записано';
+        btn.classList.add('done');
+        if (navigator.vibrate) try { navigator.vibrate([10,50,10]); } catch(e){}
+        setTimeout(function () { renderSheet(); }, 650);
+      });
+    }
+  }
+
+  document.getElementById('fabBtn').addEventListener('click', openPicker);
+  document.getElementById('sheetBack').addEventListener('click', function () {
+    if (view === 'log') { view = 'groups'; renderSheet(); }
+    else if (view === 'list') { view = 'groups'; renderSheet(); }
+    else closeSheet();
+  });
+  backdrop.addEventListener('click', closeSheet);
+
+  renderWeek();
+  renderSummary();
+  renderExercises(-1);
+  renderVolume();
+})();
+</script>
+</body>
+</html>
