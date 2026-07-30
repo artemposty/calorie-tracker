@@ -166,13 +166,11 @@ export function WeekStrip({ selectedDate, onSelectDate, nutritionData, goalKcal 
     void trackRef.current.offsetHeight; // force reflow so 'none' takes effect first
   }, [weekMonday, containerWidth]);
 
-  // Replay the staggered bar-fill whenever the visible week changes,
-  // not just on first mount: collapse instantly, then refill.
+  // Staggered bar-fill plays once, on screen open only.
   useEffect(() => {
-    setMounted(false);
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
-  }, [weekMonday]);
+  }, []);
 
   const isCurrentWeek = weekMonday === mondayOf(today);
   const prevMonday = addDays(weekMonday, -7);
