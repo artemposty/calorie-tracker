@@ -53,7 +53,12 @@ function SwipeRow({ children, onDelete, onEdit }: SwipeRowProps) {
   const startX = useRef(0);
   const startY = useRef(0);
   const direction = useRef<'h' | 'v' | null>(null);
+  const editFired = useRef(false);
   const rowRef = useRef<HTMLDivElement>(null);
+
+  // The native listener below is attached once; keep the latest callback reachable.
+  const onEditRef = useRef(onEdit);
+  useEffect(() => { onEditRef.current = onEdit; });
 
   useEffect(() => {
     const el = rowRef.current;
@@ -70,7 +75,18 @@ function SwipeRow({ children, onDelete, onEdit }: SwipeRowProps) {
       }
       if (direction.current === 'h') {
         e.preventDefault();
+        if (editFired.current) return;
         setOffset(Math.max(-80, Math.min(80, dx)));
+        // Edit opens the moment the threshold is crossed, mid-drag —
+        // no waiting for release (native iOS list behavior). Delete stays
+        // release-then-confirm because it's destructive.
+        if (dx >= 65) {
+          editFired.current = true;
+          haptic('light');
+          setSnapping(true);
+          setOffset(0);
+          onEditRef.current();
+        }
       }
     }
 
@@ -83,19 +99,17 @@ function SwipeRow({ children, onDelete, onEdit }: SwipeRowProps) {
     startX.current = e.touches[0].clientX;
     startY.current = e.touches[0].clientY;
     direction.current = null;
+    editFired.current = false;
     setSnapping(false);
   }
 
   function onTouchEnd() {
+    if (editFired.current) { direction.current = null; return; }
     setSnapping(true);
     if (offset <= -65) {
       haptic('medium');
       setOffset(-80);
       setAwaitConfirm(true);
-    } else if (offset >= 65) {
-      haptic('light');
-      setOffset(0);
-      onEdit();
     } else {
       if (Math.abs(offset) > 8) haptic('light');
       setOffset(0);

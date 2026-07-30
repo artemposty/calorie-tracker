@@ -94,7 +94,8 @@ function DayCell({ d, i, mounted, goalKcal, onSelectDate }: {
           height: mounted ? `${heightPct}%` : 0,
           borderRadius: 3,
           background: color,
-          transition: `height 0.45s cubic-bezier(0.2,0,0,1) ${i * 40}ms`,
+          // Collapse instantly (invisible reset frame), refill with stagger
+          transition: mounted ? `height 0.45s cubic-bezier(0.2,0,0,1) ${i * 40}ms` : 'none',
         }} />
       </div>
       <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--text-1)', opacity: d.isToday ? 1 : 0, marginTop: -1 }} />
@@ -165,7 +166,13 @@ export function WeekStrip({ selectedDate, onSelectDate, nutritionData, goalKcal 
     void trackRef.current.offsetHeight; // force reflow so 'none' takes effect first
   }, [weekMonday, containerWidth]);
 
-  useEffect(() => { const t = setTimeout(() => setMounted(true), 60); return () => clearTimeout(t); }, []);
+  // Replay the staggered bar-fill whenever the visible week changes,
+  // not just on first mount: collapse instantly, then refill.
+  useEffect(() => {
+    setMounted(false);
+    const t = setTimeout(() => setMounted(true), 60);
+    return () => clearTimeout(t);
+  }, [weekMonday]);
 
   const isCurrentWeek = weekMonday === mondayOf(today);
   const prevMonday = addDays(weekMonday, -7);
