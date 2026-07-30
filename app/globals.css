@@ -28,6 +28,12 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior-y: auto;
+  /* Wide children (ruler strips, week-strip tracks) must never widen the
+     document — iOS rescales the whole page to fit when that happens. */
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }
 
 /* ── Animations ────────────────────────────────────────────────────────── */

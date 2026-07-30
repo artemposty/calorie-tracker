@@ -31,7 +31,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-full antialiased" style={{ background: '#0a0a0b' }}>
         {children}
         <Script id="sw-register" strategy="afterInteractive">
-          {`if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js'); }`}
+          {`if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(function (reg) { reg.update(); });
+            // A new worker taking control means the old one was serving stale
+            // HTML/CSS — reload once so the page matches the deployed build.
+            var reloaded = false;
+            navigator.serviceWorker.addEventListener('controllerchange', function () {
+              if (reloaded) return;
+              reloaded = true;
+              window.location.reload();
+            });
+          }`}
         </Script>
       </body>
     </html>

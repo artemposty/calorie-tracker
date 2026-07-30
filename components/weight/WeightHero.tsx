@@ -150,7 +150,9 @@ export function WeightHero({ initial, savedToday, startWeight, onSave }: Props) 
       <div
         ref={wrapRef}
         className="relative mt-4"
-        style={{ height: 64, touchAction: 'pan-y', cursor: 'grab' }}
+        // overflow:hidden here too — the tick strip is ~1280px wide and must
+        // not be able to widen the document if the card's clipping ever moves.
+        style={{ height: 64, touchAction: 'pan-y', cursor: 'grab', overflow: 'hidden' }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
       >
